@@ -30,8 +30,6 @@ use ESign\Api;
  //   patient_encounter.php.  This will also self-load the superbill pages
  //   as requested.
  // * interface/usergroup/user_info.php: removed Back link.
- // * interface/usergroup/admin_frameset.php: new frameset for Admin pages,
- //   cloned from usergroup.php.
  // * interface/main/onotes/office_comments.php: removed Back link target.
  // * interface/main/onotes/office_comments_full.php: changed Back link.
  // * interface/billing/billing_report.php: removed Back link; added logic
@@ -118,7 +116,6 @@ $primary_docs = array(
 'pwd' => array(xl('Password')  , 0, 'usergroup/user_info.php'),
 'mfa' => array(xl('MFA Management'), 0, 'usergroup/mfa_registrations.php'),
 'prf' => array(xl('Preferences')  , 0, 'super/edit_globals.php?mode=user'),
-'adm' => array(xl('Admin')     , 0, 'usergroup/admin_frameset.php'),
 'rep' => array(xl('Reports')   , 0, 'reports/index.php'),
 'ono' => array(xl('Ofc Notes') , 0, 'main/onotes/office_comments.php'),
 'fax' => array(xl('Fax/Scan')  , 0, 'fax/faxq.php'),
@@ -460,7 +457,10 @@ function genFindBlock()
    // Send the skip_timeout_reset parameter to not count this as a manual entry in the
    //  timing out mechanism in OpenEMR.
    $.post("<?php echo $GLOBALS['webroot']; ?>/library/ajax/dated_reminders_counter.php",
-     { skip_timeout_reset: "1" },
+     {
+       skip_timeout_reset: "1",
+       csrf_token_form: "<?php echo attr(collectCsrfToken()); ?>"
+     },
      function(data) {
        $("#reminderCountSpan").html(data);
     // run updater every 60 seconds
@@ -469,7 +469,11 @@ function genFindBlock()
    //piggy-back on this repeater to run other background-services
    //this is a silent task manager that returns no output
    $.post("<?php echo $GLOBALS['webroot']; ?>/library/ajax/execute_background_services.php",
-      { skip_timeout_reset: "1", ajax: "1" });
+      {
+          skip_timeout_reset: "1",
+          ajax: "1",
+          csrf_token_form: "<?php echo attr(collectCsrfToken()); ?>"
+      });
  }
 
  $(document).ready(function (){
@@ -1133,6 +1137,7 @@ $(document).ready(function(){
 
 <form method='post' name='find_patient' target='RTop'
  action='<?php echo $rootdir ?>/main/finder/patient_select.php'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
 
 <center>
 <select name='sel_frame' style='background-color:transparent;font-size:9pt;width:100;'>
@@ -1888,7 +1893,12 @@ function save_setting (cb_frames) {
         try {
             var fref = '<?php echo $uspfx ?>frame' + i + '_chk';
             var ureq = $.post( "<?php echo $GLOBALS['webroot'] ?>/library/ajax/user_settings.php",
-                    { lab: fref, val: cb_frames[i] })
+                {
+                    lab: fref,
+                    val: cb_frames[i],
+                    csrf_token_form: "<?php echo attr(collectCsrfToken()); ?>"
+                }
+            )
             .done(function(data) {
                 // alert( "Data Loaded: " + data );
             })

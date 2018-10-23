@@ -189,10 +189,13 @@ if (!empty($registrations)) {
 // within the OpenEMR instance by calling top.restoreSession() whenever
 // refreshing or starting a new script.
 if (isset($_POST['new_login_session_management'])) {
-  // This is a new login, so create a new session id and remove the old session
+    // This is a new login, so create a new session id and remove the old session
     session_regenerate_id(true);
 } else {
-  // This is not a new login, so create a new session id and do NOT remove the old session
+    // This is not a new login, so check csrf and then create a new session id and do NOT remove the old session
+    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
+        csrfNotVerified();
+    }
     session_regenerate_id(false);
 }
 // Create the csrf_token
@@ -290,12 +293,14 @@ if ($GLOBALS['new_tabs_layout']) {
     $_SESSION['frame1target'] = $frame1target;
     $_SESSION['frame2url'] = $frame2url;
     $_SESSION['frame2target'] = $frame2target;
-  // mdsupport - Apps processing invoked for valid app selections from list
+    // mdsupport - Apps processing invoked for valid app selections from list
     if ((isset($_POST['appChoice'])) && ($_POST['appChoice'] !== '*OpenEMR')) {
         $_SESSION['app1'] = $_POST['appChoice'];
     }
 
-    header('Location: '.$web_root."/interface/main/tabs/main.php");
+    // Pass a unique token, so main.php script can not be run on its own
+    $_SESSION['token_main_php'] = createUniqueToken();
+    header('Location: ' . $web_root . "/interface/main/tabs/main.php?token_main=" . urlencode($_SESSION['token_main_php']));
     exit();
 }
 

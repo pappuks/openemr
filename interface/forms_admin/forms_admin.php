@@ -15,17 +15,17 @@ require_once("$srcdir/registry.inc");
 
 if ($_GET['method'] == "enable") {
     if (!verifyCsrfToken($_GET["csrf_token_form"])) {
-        die(xlt('Authentication Error'));
+        csrfNotVerified();
     }
     updateRegistered($_GET['id'], "state=1");
 } elseif ($_GET['method'] == "disable") {
     if (!verifyCsrfToken($_GET["csrf_token_form"])) {
-        die(xlt('Authentication Error'));
+        csrfNotVerified();
     }
     updateRegistered($_GET['id'], "state=0");
 } elseif ($_GET['method'] == "install_db") {
     if (!verifyCsrfToken($_GET["csrf_token_form"])) {
-        die(xlt('Authentication Error'));
+        csrfNotVerified();
     }
     $dir = getRegistryEntry($_GET['id'], "directory");
     if (installSQL("$srcdir/../interface/forms/{$dir['directory']}")) {
@@ -35,7 +35,7 @@ if ($_GET['method'] == "enable") {
     }
 } elseif ($_GET['method'] == "register") {
     if (!verifyCsrfToken($_GET["csrf_token_form"])) {
-        die(xlt('Authentication Error'));
+        csrfNotVerified();
     }
     registerForm($_GET['name']) or $err=xl('error while registering form!');
 }
@@ -55,7 +55,7 @@ $bigdata = getRegistered("%") or $bigdata = false;
 <?php
 if (!empty($_POST)) {
     if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        die(xlt('Authentication Error'));
+        csrfNotVerified();
     }
     foreach ($_POST as $key => $val) {
         if (preg_match('/nickname_(\d+)/', $key, $matches)) {
@@ -116,9 +116,9 @@ if ($bigdata != false) {
     if ($registry['sql_run'] == 0) {
         echo "<td bgcolor='" . attr($color) . "' width='10%'><span class='text'>" . xlt('registered') . "</span>";
     } elseif ($registry['state'] == "0") {
-        echo "<td bgcolor='#FFCCCC' width='10%'><a class='link_submit' href='./forms_admin.php?id=" . attr($registry['id']) . "&method=enable&csrf_token_form=" . attr(urlencode(collectCsrfToken())) . "'>" . xlt('disabled') . "</a>";
+        echo "<td bgcolor='#FFCCCC' width='10%'><a class='link_submit' href='./forms_admin.php?id=" . attr(urlencode($registry['id'])) . "&method=enable&csrf_token_form=" . attr(urlencode(collectCsrfToken())) . "'>" . xlt('disabled') . "</a>";
     } else {
-        echo "<td bgcolor='#CCFFCC' width='10%'><a class='link_submit' href='./forms_admin.php?id=" . attr($registry['id']) . "&method=disable&csrf_token_form=" . attr(urlencode(collectCsrfToken())) . "'>" . xlt('enabled') . "</a>";
+        echo "<td bgcolor='#CCFFCC' width='10%'><a class='link_submit' href='./forms_admin.php?id=" . attr(urlencode($registry['id'])) . "&method=disable&csrf_token_form=" . attr(urlencode(collectCsrfToken())) . "'>" . xlt('enabled') . "</a>";
     }
         ?></td>
         <td bgcolor="<?php echo attr($color); ?>" width="10%">
@@ -135,7 +135,7 @@ if ($bigdata != false) {
         if ($registry['sql_run']) {
             echo "<span class='text'>" . xlt('DB installed') . "</span>";
         } else {
-            echo "<a class='link_submit' href='./forms_admin.php?id=" . attr($registry['id']) . "&method=install_db&csrf_token_form=" . attr(urlencode(collectCsrfToken())) . "'>" . xlt('install DB') . "</a>";
+            echo "<a class='link_submit' href='./forms_admin.php?id=" . attr(urlencode($registry['id'])) . "&method=install_db&csrf_token_form=" . attr(urlencode(collectCsrfToken())) . "'>" . xlt('install DB') . "</a>";
         }
         ?>
         </td>
@@ -211,7 +211,7 @@ foreach ($inDir as $fname) {
         </td>
         <td bgcolor="<?php echo $color?>" width="10%"><?php
         if ($phpState == "PHP extracted") {
-            echo '<a class=link_submit href="./forms_admin.php?name=' . urlencode($fname) . '&method=register&csrf_token_form=' . attr(urlencode(collectCsrfToken())) . '">' . xlt('register') . '</a>';
+            echo '<a class=link_submit href="./forms_admin.php?name=' . attr(urlencode($fname)) . '&method=register&csrf_token_form=' . attr(urlencode(collectCsrfToken())) . '">' . xlt('register') . '</a>';
         } else {
             echo '<span class=text>' . xlt('n/a') . '</span>';
         }
