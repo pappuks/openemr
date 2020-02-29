@@ -1,35 +1,32 @@
 <?php
-/********************************************************************************\
- * Copyright (C) ViCarePlus, Visolve (vicareplus_engg@visolve.com)              *
- *                                                                              *
- * This program is free software; you can redistribute it and/or                *
- * modify it under the terms of the GNU General Public License                  *
- * as published by the Free Software Foundation; either version 2               *
- * of the License, or (at your option) any later version.                       *
- *                                                                              *
- * This program is distributed in the hope that it will be useful,              *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of               *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                *
- * GNU General Public License for more details.                                 *
- *                                                                              *
- * You should have received a copy of the GNU General Public License            *
- * along with this program; if not, write to the Free Software                  *
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.  *
- \********************************************************************************/
+/**
+ * de_identification script 2
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    ViCarePlus, Visolve <vicareplus_engg@visolve.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2010 ViCarePlus, Visolve <vicareplus_engg@visolve.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
 
 require_once("../globals.php");
 require_once("$srcdir/lists.inc");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/acl.inc");
 require_once("$srcdir/options.inc.php");
 
-if (!acl_check('admin', 'super')) {
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
+if (!AclMain::aclCheckCore('admin', 'super')) {
     die(xlt('Not authorized'));
 }
 
-if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-    csrfNotVerified();
+if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
 }
 
 /*executes the De Identification process, using the parameters chosen from the
@@ -93,12 +90,13 @@ if ($row = sqlFetchArray($res)) {
 
 if ($deIdentificationStatus == 0) {
  //0 - There is no De Identification in progress. (start new De Identification process)
-        ?>
+    ?>
 <html>
 <head>
 <title>De Identification</title>
-<link rel="stylesheet" href='<?php echo $css_header ?>' type='text/css'>
-<script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
+
+    <?php Header::setupHeader(); ?>
+
 <style type="text/css">
 .style1 {
     text-align: center;
@@ -115,7 +113,7 @@ if ($deIdentificationStatus == 0) {
     if ($row = sqlFetchArray($res)) {
         $no_of_items = $row['count'];
         if ($no_of_items == 0) {
-            $cmd="cp " . escapeshellarg($GLOBALS['webserver_root']."/sql/metadata_de_identification.txt") . " " . escapeshellarg($GLOBALS['temporary_files_dir']."/metadata_de_identification.txt");
+            $cmd="cp " . escapeshellarg($GLOBALS['fileroot']."/sql/metadata_de_identification.txt") . " " . escapeshellarg($GLOBALS['temporary_files_dir']."/metadata_de_identification.txt");
             $output3=shell_exec($cmd);
             $query = "LOAD DATA INFILE '" . add_escape_custom($GLOBALS['temporary_files_dir']) ."/metadata_de_identification.txt' INTO TABLE metadata_de_identification FIELDS TERMINATED BY ','  LINES TERMINATED BY '\n'";
             $res = sqlStatement($query);
@@ -176,11 +174,11 @@ if ($deIdentificationStatus == 0) {
     <tr valign="top">
 
         <td>&nbsp;</td>
-        <td rowspan="3"><br>
-        <?php echo xlt('No Patient record found for given Selection criteria');
-        echo "</br></br>";
-        echo xlt('Please start new De Identification process');
-        echo "</br>";   ?> </br>
+        <td rowspan="3"><br />
+                        <?php echo xlt('No Patient record found for given Selection criteria');
+                        echo "<br /><br />";
+                        echo xlt('Please start new De Identification process');
+                        echo "<br />";   ?> <br />
         </td>
         <td>&nbsp;</td>
     </tr>
@@ -200,7 +198,7 @@ if ($deIdentificationStatus == 0) {
     </tr>
     </table>
 
-        <?php
+                        <?php
                     } else {   //delete old de_identified_data.xls file
                         $timestamp=0;
                         $query = "select now() as timestamp";
@@ -229,11 +227,11 @@ if ($deIdentificationStatus == 0) {
     <table class="de_identification_status_message" align="center">
     <tr valign="top">
         <td>&nbsp;</td>
-        <td rowspan="3"><br>
-        <?php echo xlt('De Identification Process is ongoing');
-        echo "</br></br>";
-        echo xlt('Please visit De Identification screen after some time');
-        echo "</br>";   ?> </br>
+        <td rowspan="3"><br />
+                        <?php echo xlt('De Identification Process is ongoing');
+                        echo "<br /><br />";
+                        echo xlt('Please visit De Identification screen after some time');
+                        echo "<br />";   ?> <br />
         </td>
         <td>&nbsp;</td>
     </tr>
@@ -252,7 +250,7 @@ if ($deIdentificationStatus == 0) {
         <td>&nbsp;</td>
     </tr>
     </table>
-        <?php
+                        <?php
                     }
                 }
             }

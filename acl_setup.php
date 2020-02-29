@@ -2,7 +2,7 @@
 /**
  * This program is run by the OpenEMR setup.php script to install phpGACL
  * and creates the Access Control Objects and their sections.
- * See openemr/library/acl.inc file for the list of
+ * See src/Common/Acl/AclMain.php file for the list of
  * currently supported Access Control Objects(ACO), which this
  * script will install.  This script also creates several
  * ARO groups, an "admin" ARO, and some reasonable ACL entries for
@@ -29,20 +29,14 @@
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
-require_once(dirname(__FILE__).'/library/acl.inc');
+use OpenEMR\Gacl\GaclApi;
 
-if (empty($phpgacl_location)) {
-    die("You must first set up library/acl.inc to use phpGACL!");
-}
-
-require_once("$phpgacl_location/gacl_api.class.php");
-
-$gacl = new gacl_api();
+$gacl = new GaclApi();
 
 // Create the ACO sections.  Every ACO must have a section.
 //
 if ($gacl->add_object_section('Accounting', 'acct', 10, 0, 'ACO') === false) {
-    echo "Unable to create the access controls for OpenEMR.  You have likely already run this script (acl_setup.php) successfully.<br>Other possible problems include php-GACL configuration file errors (gacl.ini.php or gacl.class.php).<br>";
+    echo "Unable to create the access controls for OpenEMR.  You have likely already run this script (acl_setup.php) successfully.<br />Other possible problems include php-GACL configuration file errors (gacl.ini.php or Gacl.php).<br>";
     return;
 }
 // xl('Accounting')
@@ -188,6 +182,8 @@ $gacl->add_object('patients', 'Amendments (write,addonly optional)', 'amendment'
 // xl('Amendments (write,addonly optional)')
 $gacl->add_object('patients', 'Lab Results (write,addonly optional)', 'lab', 10, 0, 'ACO');
 // xl('Lab Results (write,addonly optional)')
+$gacl->add_object('patients', 'Patient Report', 'pat_rep', 10, 0, 'ACO');
+// xl('Patient Report')
 
 
 $gacl->add_object('groups', 'View/Add/Update groups', 'gadd', 10, 0, 'ACO');
@@ -265,7 +261,7 @@ $gacl->add_acl(
         'admin'=>array('calendar', 'database', 'forms', 'practice', 'superbill', 'users', 'batchcom', 'language', 'super', 'drugs', 'acl','multipledb','menu','manage_modules'),
         'encounters'=>array('auth_a', 'auth', 'coding_a', 'coding', 'notes_a', 'notes', 'date_a', 'relaxed'),
         'lists'=>array('default','state','country','language','ethrace'),
-        'patients'=>array('appt', 'demo', 'med', 'trans', 'docs', 'notes', 'sign', 'reminder', 'alert', 'disclosure', 'rx', 'amendment', 'lab', 'docs_rm'),
+        'patients'=>array('appt', 'demo', 'med', 'trans', 'docs', 'notes', 'sign', 'reminder', 'alert', 'disclosure', 'rx', 'amendment', 'lab', 'docs_rm','pat_rep'),
         'sensitivities'=>array('normal', 'high'),
         'nationnotes'=>array('nn_configure'),
         'patientportal'=>array('portal'),
@@ -287,7 +283,7 @@ $gacl->add_acl(
 //
 $gacl->add_acl(
     array(
-        'placeholder'=>array('filler')
+        'patients'=>array('pat_rep')
     ),
     null,
     array($doc),
@@ -352,7 +348,7 @@ $gacl->add_acl(
 //
 $gacl->add_acl(
     array(
-        'placeholder'=>array('filler')
+        'patients'=>array('pat_rep')
     ),
     null,
     array($clin),
@@ -416,7 +412,7 @@ $gacl->add_acl(
 //
 $gacl->add_acl(
     array(
-        'patients'=>array('alert')
+        'patients'=>array('alert','pat_rep')
     ),
     null,
     array($front),
@@ -476,7 +472,7 @@ $gacl->add_acl(
 //
 $gacl->add_acl(
     array(
-        'patients'=>array('alert')
+        'patients'=>array('alert','pat_rep')
     ),
     null,
     array($back),
@@ -542,7 +538,7 @@ $gacl->add_acl(
         'admin'=>array('calendar', 'database', 'forms', 'practice', 'superbill', 'users', 'batchcom', 'language', 'super', 'drugs', 'acl','multipledb','menu','manage_modules'),
         'encounters'=>array('auth_a', 'auth', 'coding_a', 'coding', 'notes_a', 'notes', 'date_a', 'relaxed'),
         'lists'=>array('default','state','country','language','ethrace'),
-        'patients'=>array('appt', 'demo', 'med', 'trans', 'docs', 'notes', 'sign', 'reminder', 'alert', 'disclosure', 'rx', 'amendment', 'lab', 'docs_rm'),
+        'patients'=>array('appt', 'demo', 'med', 'trans', 'docs', 'notes', 'sign', 'reminder', 'alert', 'disclosure', 'rx', 'amendment', 'lab', 'docs_rm','pat_rep'),
         'sensitivities'=>array('normal', 'high'),
         'nationnotes'=>array('nn_configure'),
         'patientportal'=>array('portal'),
@@ -568,7 +564,7 @@ $gacl->add_acl(
 </head>
 <body>
 <b>OpenEMR ACL Setup</b>
-<br>
+<br />
 All done configuring and installing access controls (php-GACL)!
 </body>
 </html>

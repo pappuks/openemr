@@ -38,8 +38,8 @@ function send_drug_email($subject, $body)
     $mail->Subject = $subject;
     $mail->AddAddress($recipient);
     if (!$mail->Send()) {
-        error_log("There has been a mail error sending to " . $recipient .
-        " " . $mail->ErrorInfo);
+        error_log("There has been a mail error sending to " . errorLogEscape($recipient .
+        " " . $mail->ErrorInfo));
     }
 }
 
@@ -296,7 +296,7 @@ function sellDrug(
 function isUserRestricted($userid = 0)
 {
     if (!$userid) {
-        $userid = $_SESSION['authId'];
+        $userid = $_SESSION['authUserID'];
     }
 
     $countrow = sqlQuery("SELECT count(*) AS count FROM users_facility WHERE " .
@@ -309,7 +309,7 @@ function isUserRestricted($userid = 0)
 function isFacilityAllowed($facid, $userid = 0)
 {
     if (!$userid) {
-        $userid = $_SESSION['authId'];
+        $userid = $_SESSION['authUserID'];
     }
 
     $countrow = sqlQuery(
@@ -334,7 +334,7 @@ function isFacilityAllowed($facid, $userid = 0)
 function isWarehouseAllowed($facid, $whid, $userid = 0)
 {
     if (!$userid) {
-        $userid = $_SESSION['authId'];
+        $userid = $_SESSION['authUserID'];
     }
 
     $countrow = sqlQuery(

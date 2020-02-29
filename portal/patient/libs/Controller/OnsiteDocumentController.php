@@ -1,26 +1,12 @@
 <?php
-/** @package    Patient Portal::Controller */
-
 /**
+ * OnsiteDocumentController.php
  *
- * Copyright (C) 2016-2017 Jerry Padgett <sjpadgett@gmail.com>
- *
- * LICENSE: This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU Affero General Public License as
- *  published by the Free Software Foundation, either version 3 of the
- *  License, or (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU Affero General Public License for more details.
- *
- *  You should have received a copy of the GNU Affero General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * @package OpenEMR
- * @author Jerry Padgett <sjpadgett@gmail.com>
- * @link http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      https://www.open-emr.org
+ * @author    Jerry Padgett <sjpadgett@gmail.com>
+ * @copyright Copyright (c) 2016-2019 Jerry Padgett <sjpadgett@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 /** import supporting libraries */
@@ -47,8 +33,6 @@ class OnsiteDocumentController extends AppBaseController
     protected function Init()
     {
         parent::Init();
-
-        // $this->RequirePermission(ExampleUser::$PERMISSION_USER,'SecureExample.LoginForm');
     }
 
     /**
@@ -57,7 +41,9 @@ class OnsiteDocumentController extends AppBaseController
     public function ListView()
     {
         $recid = $pid = $user = $encounter =  0;
-        $docid = "";
+        $is_module = $catid = 0;
+        $is_portal = GlobalConfig::$PORTAL;
+        $docid = $new_filename = "";
 
         if (isset($_GET['pid'])) {
             $pid = ( int ) $_GET['pid'];
@@ -79,12 +65,25 @@ class OnsiteDocumentController extends AppBaseController
             $recid = ( int ) $_GET['recid'];
         }
 
+        if (isset($_GET['is_module'])) {
+            $is_module = $_GET['is_module'];
+        }
+
+        if (isset($_GET['catid'])) {
+            $catid = $_GET['catid'];
+        }
+        if (isset($_GET['new'])) {
+            $new_filename = $_GET['new'];
+        }
         $this->Assign('recid', $recid);
         $this->Assign('cpid', $pid);
         $this->Assign('cuser', $user);
         $this->Assign('encounter', $encounter);
         $this->Assign('docid', $docid);
-
+        $this->Assign('is_module', $is_module);
+        $this->Assign('is_portal', $is_portal);
+        $this->Assign('save_catid', $catid);
+        $this->Assign('new_filename', $new_filename);
         $this->Render();
     }
 

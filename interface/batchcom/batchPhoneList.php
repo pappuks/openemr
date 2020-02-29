@@ -14,17 +14,18 @@
 
 require_once("../globals.php");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
-if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-    csrfNotVerified();
+if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
 }
 
 ?>
 <html>
 <head>
-<title><?php echo xlt("Phone Call List"); ?></title>
-<?php Header::setupHeader(); ?>
+    <?php Header::setupHeader(); ?>
+    <title><?php echo xlt("Phone Call List"); ?></title>
 </head>
 <body class="body_top container">
     <header class="row">
@@ -34,7 +35,7 @@ if (!verifyCsrfToken($_POST["csrf_token_form"])) {
             <small><?php echo xlt('Phone Call List report'); ?></small>
         </h1>
     </header>
-    <main class="row">
+    <main class="row mx-4">
         <div class="col-md-12">
             <table class="table table-striped table-bordered">
                 <thead>

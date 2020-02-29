@@ -1,7 +1,21 @@
 <?php
-include_once("../../globals.php");
-include_once("../../../custom/code_types.inc.php");
-include_once("$srcdir/billing.inc");
+/**
+ * superbill_codes.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
+
+require_once("../../globals.php");
+require_once("../../../custom/code_types.inc.php");
+
+use OpenEMR\Billing\BillingUtilities;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 //the number of rows to display before resetting and starting a new column:
 $N=10;
@@ -15,21 +29,24 @@ $code     = $_GET['code'];
 $text     = $_GET['text'];
 
 if (isset($mode)) {
+    if (!CsrfUtils::verifyCsrfToken($_GET["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+
     if ($mode == "add") {
         if (strtolower($type) == "copay") {
-            addBilling($encounter, $type, sprintf("%01.2f", $code), $text, $pid, $userauthorized, $_SESSION['authUserID'], $modifier, $units, sprintf("%01.2f", 0 - $code));
+            BillingUtilities::addBilling($encounter, $type, sprintf("%01.2f", $code), $text, $pid, $userauthorized, $_SESSION['authUserID'], $modifier, $units, sprintf("%01.2f", 0 - $code));
         } elseif (strtolower($type) == "other") {
-            addBilling($encounter, $type, $code, $text, $pid, $userauthorized, $_SESSION['authUserID'], $modifier, $units, sprintf("%01.2f", $fee));
+            BillingUtilities::addBilling($encounter, $type, $code, $text, $pid, $userauthorized, $_SESSION['authUserID'], $modifier, $units, sprintf("%01.2f", $fee));
         } else {
-            addBilling($encounter, $type, $code, $text, $pid, $userauthorized, $_SESSION['authUserID'], $modifier, $units, $fee);
+            BillingUtilities::addBilling($encounter, $type, $code, $text, $pid, $userauthorized, $_SESSION['authUserID'], $modifier, $units, $fee);
         }
     }
 }
 ?>
 <html>
 <head>
-<?php html_header_show();?>
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
+<?php Header::setupHeader(); ?>
 </head>
 <body class="body_bottom">
 
@@ -42,12 +59,12 @@ if (isset($mode)) {
 <dt>
 
 <a href="superbill_custom_full.php" onclick="top.restoreSession()">
-<span class=title><?php xl('Superbill', 'e'); ?></span>
-<font class=more><?php echo $tmore;?></font></a>
+<span class=title><?php echo xlt('Superbill'); ?></span>
+<font class=more><?php echo text($tmore); ?></font></a>
 
 <a href="encounter_bottom.php" onclick="top.restoreSession()">
 
-<font class=more><?php echo $tback;?></font></a>
+<font class=more><?php echo text($tback); ?></font></a>
 
 </dt>
 </td></tr>
@@ -61,7 +78,7 @@ $codes = array();
 echo " <tr>\n";
 foreach ($code_types as $key => $value) {
     $codes[$key] = array();
-    echo "  <th align='left'>$key Codes</th>\n";
+    echo "  <th align='left'>" . text($key) . " Codes</th>\n";
 }
 
 echo " </tr>\n";
@@ -90,14 +107,15 @@ while ($index < $numlines) {
             $code = $value[$index];
             echo "   <dd><a class='text' ";
             echo "href='superbill_codes.php?back=1&mode=add" .
-                "&type="     . urlencode($key) .
-                "&modifier=" . urlencode($code{"modifier"}) .
-                "&units="    . urlencode($code{"units"}) .
-                "&fee="      . urlencode($code{"fee"}) .
-                "&code="     . urlencode($code{"code"}) .
-                "&text="     . urlencode($code{"code_text"}) .
+                "&type="     . attr_url($key) .
+                "&modifier=" . attr_url($code["modifier"]) .
+                "&units="    . attr_url($code["units"]) .
+                "&fee="      . attr_url($code["fee"]) .
+                "&code="     . attr_url($code["code"]) .
+                "&text="     . attr_url($code["code_text"]) .
+                "&csrf_token_form=" . attr_url(CsrfUtils::collectCsrfToken()) .
             "' onclick='top.restoreSession()'>";
-            echo "<b>" . $code['code'] . "</b>" . "&nbsp;" . $code['modifier'] . "&nbsp;" . $code['code_text'] ;
+            echo "<b>" . text($code['code']) . "</b>" . "&nbsp;" . text($code['modifier']) . "&nbsp;" . text($code['code_text']);
             echo "</a></dd>\n";
         }
 

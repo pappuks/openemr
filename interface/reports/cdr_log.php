@@ -5,7 +5,7 @@
  * @package   OpenEMR
  * @link      http://www.open-emr.org
  * @author    Brady Miller <brady.g.miller@gmail.com>
- * @copyright Copyright (c) 2015-2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2015-2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
@@ -15,7 +15,14 @@ require_once("../../library/patient.inc");
 require_once "$srcdir/options.inc.php";
 require_once "$srcdir/clinical_rules.php";
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
+
+if (!empty($_POST)) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+}
 
 $form_begin_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_begin_date']);
 $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
@@ -29,7 +36,7 @@ $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
     <?php Header::setupHeader('datetime-picker'); ?>
 
     <script LANGUAGE="JavaScript">
-        $(document).ready(function() {
+        $(function() {
             $('.datepicker').datetimepicker({
                 <?php $datetimepicker_timepicker = true; ?>
                 <?php $datetimepicker_showseconds = true; ?>
@@ -73,19 +80,21 @@ $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
 
 <span class='title'><?php echo xlt('Alerts Log'); ?></span>
 
-<form method='post' name='theform' id='theform' action='cdr_log.php?search=1' onsubmit='return top.restoreSession()'>
+<form method='post' name='theform' id='theform' action='cdr_log.php' onsubmit='return top.restoreSession()'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
+<input type="hidden" name="search" value="1" />
 
 <div id="report_parameters">
 
 <table>
  <tr>
   <td width='470px'>
-    <div style='float:left'>
+    <div style='float: left'>
 
     <table class='text'>
 
                    <tr>
-                      <td class='control-label'>
+                      <td class='col-form-label'>
                             <?php echo xlt('Begin Date'); ?>:
                       </td>
                       <td>
@@ -95,7 +104,7 @@ $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
                    </tr>
 
                 <tr>
-                        <td class='control-label'>
+                        <td class='col-form-label'>
                                 <?php echo xlt('End Date'); ?>:
                         </td>
                         <td>
@@ -108,12 +117,12 @@ $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
 
   </td>
   <td align='left' valign='middle' height="100%">
-    <table style='border-left:1px solid; width:100%; height:100%' >
+    <table style='border-left: 1px solid; width:100%; height:100%' >
         <tr>
             <td>
                 <div class="text-center">
           <div class="btn-group" role="group">
-            <a id='search_button' href='#' class='btn btn-default btn-search' onclick='top.restoreSession(); $("#theform").submit()'>
+            <a id='search_button' href='#' class='btn btn-secondary btn-search' onclick='top.restoreSession(); $("#theform").submit()'>
                             <?php echo xlt('Search'); ?>
             </a>
           </div>
@@ -127,12 +136,11 @@ $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
 
 </div>  <!-- end of search parameters -->
 
-<br>
+<br />
 
-<?php if ($_GET['search'] == 1) { ?>
-
+<?php if ($_POST['search'] == 1) { ?>
  <div id="report_results">
- <table>
+ <table class="table">
 
  <thead>
   <th align='center'>
@@ -200,9 +208,9 @@ $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
                   generate_display_field(array('data_type'=>'1','list_id'=>'rule_action_category'), $category) .
                   ": " . generate_display_field(array('data_type'=>'1','list_id'=>'rule_action'), $target) .
                   " (" . generate_display_field(array('data_type'=>'1','list_id'=>'rule_reminder_due_opt'), $alert['due_status']) . ")" .
-                  "<span><br>";
+                  "<span><br />";
             } else { // $row['category'] == 'allergy_alert'
-                 echo $alert . "<br>";
+                 echo $alert . "<br />";
             }
         }
         ?>
@@ -221,9 +229,9 @@ $form_end_date = DateTimeToYYYYMMDDHHMMSS($_POST['form_end_date']);
                       generate_display_field(array('data_type'=>'1','list_id'=>'rule_action_category'), $category) .
                       ": " . generate_display_field(array('data_type'=>'1','list_id'=>'rule_action'), $target) .
                       " (" . generate_display_field(array('data_type'=>'1','list_id'=>'rule_reminder_due_opt'), $alert['due_status']) . ")" .
-                      "<span><br>";
+                      "<span><br />";
                 } else { // $row['category'] == 'allergy_alert'
-                    echo $alert . "<br>";
+                    echo $alert . "<br />";
                 }
             }
         } else {

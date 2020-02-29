@@ -1,54 +1,49 @@
 <?php
-/** Work/School Note Form created by Nikolai Vitsyn: 2004/02/13 and update 2005/03/30
- *    Copyright (C) Open Source Medical Software
+/*
+ * Work/School Note Form new.php
  *
- *    This program is free software; you can redistribute it and/or
- *    modify it under the terms of the GNU General Public License
- *    as published by the Free Software Foundation; either version 2
- *    of the License, or (at your option) any later version.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, write to the Free Software
- *   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. -->
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Nikolai Vitsyn
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2004-2005 Nikolai Vitsyn
+ * @copyright Copyright (c) Open Source Medical Software
+ * @copyright Copyright (c) 2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
-include_once("../../globals.php");
-include_once("$srcdir/api.inc");
+
+require_once(__DIR__ . "/../../globals.php");
+require_once("$srcdir/api.inc");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
 formHeader("Form: note");
 $returnurl = 'encounter_top.php';
-$provider_results = sqlQuery("select fname, lname from users where username=?", array($_SESSION{"authUser"}));
+$provider_results = sqlQuery("select fname, lname from users where username=?", array($_SESSION["authUser"]));
 /* name of this form */
 $form_name = "note";
 ?>
 
 <html><head>
-<?php html_header_show();?>
 
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.min.css">
-
-<!-- supporting javascript code -->
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery/dist/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/textformat.js?v=<?php echo $v_js_includes; ?>"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
+<?php Header::setupHeader('datetime-picker'); ?>
 
 <script language="JavaScript">
 // required for textbox date verification
-var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
+var mypcc = <?php echo js_escape($GLOBALS['phone_country_code']); ?>;
 </script>
 
 </head>
 
 <body class="body_top">
-<?php echo date("F d, Y", time()); ?>
+<?php echo text(date("F d, Y", time())); ?>
 
 <form method=post action="<?php echo $rootdir."/forms/".$form_name."/save.php?mode=new";?>" name="my_form" id="my_form">
-<span class="title"><?php echo xlt('Work/School Note'); ?></span><br></br>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
+
+<span class="title"><?php echo xlt('Work/School Note'); ?></span><br /><br />
 
 <div style="margin: 10px;">
 <input type="button" class="save" value="    <?php echo xla('Save'); ?>    "> &nbsp;
@@ -59,23 +54,23 @@ var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
 <option value="WORK NOTE"><?php echo xlt('WORK NOTE'); ?></option>
 <option value="SCHOOL NOTE"><?php echo xlt('SCHOOL NOTE'); ?></option>
 </select>
-<br>
+<br />
 <b><?php echo xlt('MESSAGE:'); ?></b>
-<br>
+<br />
 <textarea name="message" id="message" rows="7" cols="47"></textarea>
-<br>
+<br />
 
 <?php
 // commented out below private field, because no field in database, and causes error.
 ?>
 <!--
 <input type="checkbox" name="private" id="private"><label for="private">This note is private</label>
-<br>
+<br />
 -->
 
-<br>
+<br />
 <b><?php echo xlt('Signature:'); ?></b>
-<br>
+<br />
 
 <table>
 <tr><td>
@@ -86,7 +81,7 @@ var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
 <td>
 <span class="text"><?php echo xlt('Date'); ?></span>
    <input type='text' size='10' class='datepicker' name='date_of_signature' id='date_of_signature'
-    value='<?php echo date('Y-m-d', time()); ?>'
+    value='<?php echo attr(date('Y-m-d', time())); ?>'
     title='<?php echo xla('yyyy-mm-dd'); ?>' />
 </td>
 </tr>
@@ -105,7 +100,7 @@ var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
 
 // jQuery stuff to make the page a little easier to use
 
-$(document).ready(function(){
+$(function(){
     $(".save").click(function() { top.restoreSession(); $('#my_form').submit(); });
     $(".dontsave").click(function() { parent.closeTab(window.name, false); });
     //$("#printform").click(function() { PrintForm(); });

@@ -12,13 +12,14 @@
  */
 require_once("../globals.php");
 require_once("$srcdir/registry.inc");
-require_once("../../library/acl.inc");
 require_once("batchcom.inc.php");
 
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
 // gacl control
-if (!acl_check('admin', 'notification')) {
+if (!AclMain::aclCheckCore('admin', 'notification')) {
     echo "<html>\n<body>\n<h1>";
     echo xlt('You are not authorized for this.');
     echo "</h1>\n</body>\n</html>\n";
@@ -36,31 +37,31 @@ $email_sender = "EMR Group";
 $email_subject = "Welcome to EMR Group";
 // process form
 if ($_POST['form_action']=='save') {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     //validation uses the functions in notification.inc.php
     if ($_POST['email_sender']=="") {
-        $form_err .= xl('Empty value in "Email Sender"') . '<br>';
+        $form_err .= xl('Empty value in "Email Sender"') . '<br />';
     }
 
     if ($_POST['email_subject']=="") {
-        $form_err .= xl('Empty value in "Email Subject"') . '<br>';
+        $form_err .= xl('Empty value in "Email Subject"') . '<br />';
     }
 
     //validate dates
     if (!check_date_format($_POST['next_app_date'])) {
-        $form_err .= xl('Date format for "Next Appointment" is not valid') . '<br>';
+        $form_err .= xl('Date format for "Next Appointment" is not valid') . '<br />';
     }
 
     // validates and or
     if ($_POST['provider_name']=="") {
-        $form_err .= xl('Empty value in "Name of Provider"') . '<br>';
+        $form_err .= xl('Empty value in "Name of Provider"') . '<br />';
     }
 
     if ($_POST['message']=="") {
-        $form_err .= xl('Empty value in "Email Text"') . '<br>';
+        $form_err .= xl('Empty value in "Email Text"') . '<br />';
     }
 
     //process sql
@@ -116,7 +117,7 @@ $min_array = array('00','05','10','15','20','25','30','35','40','45','50','55');
             <small><?php echo xlt('Email Notification'); ?></small>
         </h1>
     </header>
-    <main>
+    <main class="mx-4">
         <?php
         if ($form_err) {
             echo '<div class="alert alert-danger">' . xlt('The following errors occurred') . ': ' . text($form_err) . '</div>';
@@ -127,7 +128,7 @@ $min_array = array('00','05','10','15','20','25','30','35','40','45','50','55');
         }
         ?>
         <form name="select_form" method="post" action="">
-            <input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+            <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
             <input type="Hidden" name="type" value="Email">
             <input type="Hidden" name="notification_id" value="<?php echo attr($notification_id);?>">
             <div class="row">
@@ -152,7 +153,7 @@ $min_array = array('00','05','10','15','20','25','30','35','40','45','50','55');
             </div>
             <div class="row">
                 <div class="col-md-12 form-group">
-                    <button class="btn btn-default btn-save" type="submit" name="form_action" value="save"><?php echo xlt('Save'); ?></button>
+                    <button class="btn btn-secondary btn-save" type="submit" name="form_action" value="save"><?php echo xlt('Save'); ?></button>
                 </div>
             </div>
         </form>

@@ -3,18 +3,27 @@
  * This is an inventory transactions list.
  *
  * @package   OpenEMR
- * @link      http://www.open-emr.org
+ * @link      https://www.open-emr.org
  * @author    Rod Roark <rod@sunsetsystems.com>
  * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2010-2016 Rod Roark <rod@sunsetsystems.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2019 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
 require_once("../globals.php");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/acl.inc");
+
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
+if (!empty($_POST)) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+}
 
 function bucks($amount)
 {
@@ -23,11 +32,6 @@ function bucks($amount)
     }
 
     return '';
-}
-
-function esc4Export($str)
-{
-    return str_replace('"', '\\"', $str);
 }
 
 function thisLineItem($row, $xfer = false)
@@ -71,53 +75,53 @@ function thisLineItem($row, $xfer = false)
     }
 
     if ($form_action == 'export') {
-        echo '"' . oeFormatShortDate($row['sale_date']) . '",';
-        echo '"' . $ttype                               . '",';
-        echo '"' . esc4Export($row['name'])             . '",';
-        echo '"' . esc4Export($row['lot_number'])       . '",';
-        echo '"' . esc4Export($row['warehouse'])        . '",';
-        echo '"' . esc4Export($dpname)                  . '",';
-        echo '"' . (0 - $row['quantity'])               . '",';
-        echo '"' . bucks($row['fee'])                   . '",';
-        echo '"' . $row['billed']                       . '",';
-        echo '"' . esc4Export($row['notes'])            . '"' . "\n";
+        echo csvEscape(oeFormatShortDate($row['sale_date'])) . ',';
+        echo csvEscape($ttype)                               . ',';
+        echo csvEscape($row['name'])                         . ',';
+        echo csvEscape($row['lot_number'])                   . ',';
+        echo csvEscape($row['warehouse'])                    . ',';
+        echo csvEscape($dpname)                              . ',';
+        echo csvEscape(0 - $row['quantity'])            . ',';
+        echo csvEscape(bucks($row['fee']))                   . ',';
+        echo csvEscape($row['billed'])                       . ',';
+        echo csvEscape($row['notes'])                        . "\n";
     } else {
         $bgcolor = (++$encount & 1) ? "#ddddff" : "#ffdddd";
-    ?>
+        ?>
 
      <tr bgcolor="<?php echo $bgcolor; ?>">
   <td class="detail">
-        <?php echo htmlspecialchars(oeFormatShortDate($row['sale_date'])); ?>
+        <?php echo text(oeFormatShortDate($row['sale_date'])); ?>
   </td>
   <td class="detail">
-        <?php echo htmlspecialchars($ttype); ?>
+        <?php echo text($ttype); ?>
   </td>
   <td class="detail">
-        <?php echo htmlspecialchars($row['name']); ?>
+        <?php echo text($row['name']); ?>
   </td>
   <td class="detail">
-        <?php echo htmlspecialchars($row['lot_number']); ?>
+        <?php echo text($row['lot_number']); ?>
   </td>
   <td class="detail">
-        <?php echo htmlspecialchars($row['warehouse']); ?>
+        <?php echo text($row['warehouse']); ?>
   </td>
   <td class="detail">
-        <?php echo htmlspecialchars($dpname); ?>
+        <?php echo text($dpname); ?>
   </td>
   <td class="detail" align="right">
-        <?php echo htmlspecialchars(0 - $row['quantity']); ?>
+        <?php echo text(0 - $row['quantity']); ?>
   </td>
   <td class="detail" align="right">
-        <?php echo htmlspecialchars(bucks($row['fee'])); ?>
+        <?php echo text(bucks($row['fee'])); ?>
   </td>
   <td class="detail" align="center">
         <?php echo empty($row['billed']) ? '&nbsp;' : '*'; ?>
   </td>
   <td class="detail">
-        <?php echo htmlspecialchars($row['notes']); ?>
+        <?php echo text($row['notes']); ?>
   </td>
  </tr>
-<?php
+        <?php
     } // End not csv export
 
     $grandtotal   += $row['fee'];
@@ -135,15 +139,15 @@ function thisLineItem($row, $xfer = false)
     }
 } // end function
 
-if (! acl_check('acct', 'rep')) {
-    die(htmlspecialchars(xl("Unauthorized access."), ENT_NOQUOTES));
+if (! AclMain::aclCheckCore('acct', 'rep')) {
+    die(xlt("Unauthorized access."));
 }
 
 // this is "" or "submit" or "export".
 $form_action = $_POST['form_action'];
 
-$form_from_date  = fixDate($_POST['form_from_date'], date('Y-m-d'));
-$form_to_date    = fixDate($_POST['form_to_date'], date('Y-m-d'));
+$form_from_date = (isset($_POST['form_from_date'])) ? DateToYYYYMMDD($_POST['form_from_date']) : date('Y-m-d');
+$form_to_date   = (isset($_POST['form_to_date'])) ? DateToYYYYMMDD($_POST['form_to_date']) : date('Y-m-d');
 $form_trans_type = isset($_POST['form_trans_type']) ? $_POST['form_trans_type'] : '0';
 
 $encount = 0;
@@ -155,26 +159,24 @@ if ($form_action == 'export') {
     header("Content-Type: application/force-download");
     header("Content-Disposition: attachment; filename=inventory_transactions.csv");
     header("Content-Description: File Transfer");
-  // CSV headers:
-    echo '"' . xl('Date') . '",';
-    echo '"' . xl('Transaction') . '",';
-    echo '"' . xl('Product') . '",';
-    echo '"' . xl('Lot') . '",';
-    echo '"' . xl('Warehouse') . '",';
-    echo '"' . xl('Who') . '",';
-    echo '"' . xl('Qty') . '",';
-    echo '"' . xl('Amount') . '",';
-    echo '"' . xl('Billed') . '",';
-    echo '"' . xl('Notes') . '"' . "\n";
-} // end export
-else {
-?>
+    // CSV headers:
+    echo csvEscape(xl('Date')) . ',';
+    echo csvEscape(xl('Transaction')) . ',';
+    echo csvEscape(xl('Product')) . ',';
+    echo csvEscape(xl('Lot')) . ',';
+    echo csvEscape(xl('Warehouse')) . ',';
+    echo csvEscape(xl('Who')) . ',';
+    echo csvEscape(xl('Qty')) . ',';
+    echo csvEscape(xl('Amount')) . ',';
+    echo csvEscape(xl('Billed')) . ',';
+    echo csvEscape(xl('Notes')) . "\n";
+} else { // end export
+    ?>
 <html>
 <head>
-<?php html_header_show(); ?>
-<title><?php echo htmlspecialchars(xl('Inventory Transactions'), ENT_NOQUOTES) ?></title>
-<link rel='stylesheet' href='<?php echo $css_header ?>' type='text/css'>
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.min.css">
+<title><?php echo xlt('Inventory Transactions'); ?></title>
+
+    <?php Header::setupHeader(['datetime-picker', 'report-helper']); ?>
 
 <style type="text/css">
  /* specifically include & exclude from printing */
@@ -186,25 +188,37 @@ else {
 
  /* specifically exclude some from the screen */
  @media screen {
-  #report_parameters_daterange {visibility: hidden; display: none;}
+  #report_parameters_daterange {
+      visibility: hidden;
+      display: none;
+}
  }
 
- body       { font-family:sans-serif; font-size:10pt; font-weight:normal }
- .dehead    { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:bold }
- .detail    { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:normal }
+ body {
+     font-family:sans-serif;
+     font-size:10pt;
+     font-weight:normal;
+}
+ .dehead {
+     color:var(--black);
+     font-family:sans-serif;
+     font-size:10pt;
+     font-weight:bold; 
+}
+ .detail { color:var(--black);
+     font-family:sans-serif;
+     font-size:10pt;
+     font-weight:normal;
+}
 
  #report_results table thead {
   font-size:10pt;
  }
 </style>
 
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-1-9-1/jquery.min.js"></script>
-    <script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
-<script type="text/javascript" src="../../library/js/report_helper.js?v=<?php echo $v_js_includes; ?>"></script>
+<script>
 
-<script language='JavaScript'>
-
-    $(document).ready(function() {
+    $(function() {
         oeFixedHeaderSetup(document.getElementById('mymaintable'));
         var win = top.printLogSetup ? top : opener.top;
         win.printLogSetup(document.getElementById('printbutton'));
@@ -212,7 +226,7 @@ else {
         $('.datepicker').datetimepicker({
             <?php $datetimepicker_timepicker = false; ?>
             <?php $datetimepicker_showseconds = false; ?>
-            <?php $datetimepicker_formatInput = false; ?>
+            <?php $datetimepicker_formatInput = true; ?>
             <?php require($GLOBALS['srcdir'] . '/js/xl/jquery-datetimepicker-2-5-4.js.php'); ?>
             <?php // can add any additional javascript settings to datetimepicker here; need to prepend first setting with a comma ?>
         });
@@ -232,9 +246,10 @@ else {
 <body leftmargin='0' topmargin='0' marginwidth='0' marginheight='0' class='body_top'>
 <center>
 
-<h2><?php echo htmlspecialchars(xl('Inventory Transactions'), ENT_NOQUOTES) ?></h2>
+<h2><?php echo xlt('Inventory Transactions'); ?></h2>
 
-<form method='post' action='inventory_transactions.php'>
+<form method='post' action='inventory_transactions.php' onsubmit='return top.restoreSession()'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <div id="report_parameters">
 <!-- form_action is set to "submit" or "export" at form submit time -->
@@ -245,44 +260,41 @@ else {
    <table class='text'>
     <tr>
      <td class='label_custom'>
-        <?php echo htmlspecialchars(xl('Type'), ENT_NOQUOTES); ?>:
+        <?php echo xlt('Type'); ?>:
      </td>
      <td nowrap>
       <select name='form_trans_type' onchange='trans_type_changed()'>
-<?php
-foreach (array(
-  '0' => xl('All'),
-  '2' => xl('Purchase/Return'),
-  '1' => xl('Sale'),
-  '6' => xl('Distribution'),
-  '4' => xl('Transfer'),
-  '5' => xl('Adjustment'),
-) as $key => $value) {
-    echo "       <option value='$key'";
-    if ($key == $form_trans_type) {
-        echo " selected";
-    }
+    <?php
+    foreach (array(
+    '0' => xl('All'),
+    '2' => xl('Purchase/Return'),
+    '1' => xl('Sale'),
+    '6' => xl('Distribution'),
+    '4' => xl('Transfer'),
+    '5' => xl('Adjustment'),
+    ) as $key => $value) {
+        echo "       <option value='" . attr($key) . "'";
+        if ($key == $form_trans_type) {
+            echo " selected";
+        }
 
-    echo ">" . htmlspecialchars($value, ENT_NOQUOTES) . "</option>\n";
-}
-?>
+        echo ">" . text($value) . "</option>\n";
+    }
+    ?>
       </select>
      </td>
      <td class='label_custom'>
-        <?php echo htmlspecialchars(xl('From'), ENT_NOQUOTES); ?>:
+        <?php echo xlt('From'); ?>:
      </td>
      <td nowrap>
       <input type='text' class='datepicker' name='form_from_date' id="form_from_date" size='10'
-       value='<?php echo htmlspecialchars($form_from_date, ENT_QUOTES) ?>'
-       title='<?php echo htmlspecialchars(xl('yyyy-mm-dd'), ENT_QUOTES) ?>'>
+       value='<?php echo attr(oeFormatShortDate($form_from_date)); ?>'>
      </td>
      <td class='label_custom'>
-        <?php xl('To', 'e'); ?>:
+        <?php xl('To{{Range}}', 'e'); ?>:
      </td>
      <td nowrap>
-      <input type='text' class='datepicker' name='form_to_date' id="form_to_date" size='10'
-       value='<?php echo htmlspecialchars($form_to_date, ENT_QUOTES) ?>'
-       title='<?php echo htmlspecialchars(xl('yyyy-mm-dd'), ENT_QUOTES) ?>'>
+      <input type='text' class='datepicker' name='form_to_date' id="form_to_date" size='10' value='<?php echo attr(oeFormatShortDate($form_to_date)); ?>' />
      </td>
     </tr>
    </table>
@@ -291,15 +303,15 @@ foreach (array(
    <table style='border-left:1px solid; width:100%; height:100%'>
     <tr>
      <td valign='middle'>
-      <a href='#' class='css_button' onclick='mysubmit("submit")' style='margin-left:1em'>
-       <span><?php echo htmlspecialchars(xl('Submit'), ENT_NOQUOTES); ?></span>
+      <a href='#' class='btn btn-primary' onclick='mysubmit("submit")' style='margin-left:1em'>
+       <span><?php echo xlt('Submit'); ?></span>
       </a>
-<?php if ($form_action) { ?>
-      <a href='#' class='css_button' id='printbutton' style='margin-left:1em'>
-       <span><?php echo htmlspecialchars(xl('Print'), ENT_NOQUOTES); ?></span>
+    <?php if ($form_action) { ?>
+      <a href='#' class='btn btn-primary' id='printbutton' style='margin-left:1em'>
+       <span><?php echo xlt('Print'); ?></span>
       </a>
-      <a href='#' class='css_button' onclick='mysubmit("export")' style='margin-left:1em'>
-       <span><?php echo htmlspecialchars(xl('CSV Export'), ENT_NOQUOTES); ?></span>
+      <a href='#' class='btn btn-primary' onclick='mysubmit("export")' style='margin-left:1em'>
+       <span><?php echo xlt('CSV Export'); ?></span>
       </a>
 <?php } ?>
      </td>
@@ -310,47 +322,46 @@ foreach (array(
 </table>
 </div>
 
-<?php if ($form_action) { // if submit (already not export here) ?>
-
+    <?php if ($form_action) { // if submit (already not export here) ?>
 <div id="report_results">
 <table border='0' cellpadding='1' cellspacing='2' width='98%' id='mymaintable' class='mymaintable'>
  <thead>
  <tr bgcolor="#dddddd">
   <td class="dehead">
-    <?php echo htmlspecialchars(xl('Date'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Date'); ?>
   </td>
   <td class="dehead">
-    <?php echo htmlspecialchars(xl('Transaction'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Transaction'); ?>
   </td>
   <td class="dehead">
-    <?php echo htmlspecialchars(xl('Product'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Product'); ?>
   </td>
   <td class="dehead">
-    <?php echo htmlspecialchars(xl('Lot'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Lot'); ?>
   </td>
   <td class="dehead">
-    <?php echo htmlspecialchars(xl('Warehouse'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Warehouse'); ?>
   </td>
   <td class="dehead">
-    <?php echo htmlspecialchars(xl('Who'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Who'); ?>
   </td>
   <td class="dehead" align="right">
-    <?php echo htmlspecialchars(xl('Qty'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Qty'); ?>
   </td>
   <td class="dehead" align="right">
-    <?php echo htmlspecialchars(xl('Amount'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Amount'); ?>
   </td>
   <td class="dehead" align="Center">
-    <?php echo htmlspecialchars(xl('Billed'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Billed'); ?>
   </td>
   <td class="dehead">
-    <?php echo htmlspecialchars(xl('Notes'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Notes'); ?>
   </td>
  </tr>
  </thead>
  <tbody>
-<?php
-} // end if submit
+        <?php
+    } // end if submit
 } // end not export
 
 if ($form_action) { // if submit or export
@@ -400,41 +411,41 @@ if ($form_action) { // if submit or export
 
   // Grand totals line.
     if ($form_action != 'export') { // if submit
-    ?>
+        ?>
 
    <tr bgcolor="#dddddd">
     <td class="dehead" colspan="6">
-        <?php echo htmlspecialchars(xl('Grand Total'), ENT_NOQUOTES); ?>
+        <?php echo xlt('Grand Total'); ?>
   </td>
   <td class="dehead" align="right">
-        <?php echo htmlspecialchars($grandqty, ENT_NOQUOTES); ?>
+        <?php echo text($grandqty); ?>
   </td>
   <td class="dehead" align="right">
-        <?php echo htmlspecialchars(bucks($grandtotal), ENT_NOQUOTES); ?>
+        <?php echo text(bucks($grandtotal)); ?>
   </td>
   <td class="dehead" colspan="2">
 
   </td>
  </tr>
 
-<?php
+        <?php
     } // End if submit
 } // end if submit or export
 
 if ($form_action != 'export') {
     if ($form_action) {
-    ?>
+        ?>
    </tbody>
   </table>
   </div>
-    <?php
+        <?php
     } // end if ($form_action)
-?>
+    ?>
 
 </form>
 </center>
 </body>
 </html>
-<?php
+    <?php
 } // End not export
 ?>

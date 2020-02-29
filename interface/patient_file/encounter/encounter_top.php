@@ -5,9 +5,12 @@
  * @package   OpenEMR
  * @link      http://www.open-emr.org
  * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2017 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
 
 require_once(dirname(__FILE__).'/../../globals.php');
 require_once("$srcdir/pid.inc");
@@ -15,6 +18,7 @@ require_once("$srcdir/encounter.inc");
 require_once("$srcdir/forms.inc");
 
 use OpenEMR\Tabs\TabsWrapper;
+use OpenEMR\Core\Header;
 
 if (isset($_GET["set_encounter"])) {
     // The billing page might also be setting a new pid.
@@ -36,15 +40,15 @@ if (isset($_GET["set_encounter"])) {
 $tabset = new TabsWrapper('enctabs');
 $tabset->declareInitialTab(
     xl('Summary'),
-    "<iframe frameborder='0' style='height:100%;width:100%;' src='forms.php'>Oops</iframe>"
+    "<iframe frameborder='0' style='height:95.3%;width:100%;' src='forms.php'>Oops</iframe>"
 );
 // We might have been invoked to load a particular encounter form.
 // In that case it will be the second tab, and removable.
 if (!empty($_GET['formname'])) {
-    $url = $rootdir . "/patient_file/encounter/load_form.php?formname=" . urlencode($_GET['formname']);
+    $url = $rootdir . "/patient_file/encounter/load_form.php?formname=" . attr_url($_GET['formname']);
     $tabset->declareInitialTab(
         $_GET['formdesc'],
-        "<iframe name='enctabs-2' frameborder='0' style='height:100%;width:100%;' src='$url'>Oops</iframe>",
+        "<iframe name='enctabs-2' frameborder='0' style='height:95.3%;width:100%;' src='$url'>Oops</iframe>",
         true
     );
 }
@@ -53,21 +57,16 @@ if (!empty($_GET['formname'])) {
 $dateres = getEncounterDateByEncounter($encounter);
 $encounter_date = date("Y-m-d", strtotime($dateres["date"]));
 ?>
+
 <html>
 <head>
 <title><?php echo text(oeFormatShortDate($encounter_date)) . ' ' . xlt('Encounter'); ?></title>
-<?php html_header_show(); ?>
-<link href="<?php echo $GLOBALS['assets_static_relative']; ?>/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
-    <?php if ($_SESSION['language_direction'] == 'rtl') { ?>
-     <link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative'] ?>/bootstrap-rtl/dist/css/bootstrap-rtl.min.css">
-    <?php } ?>
+    <?php Header::setupHeader(); ?>
 <?php echo $tabset->genCss(); ?>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-1-9-1/jquery.min.js"></script>
-<script src="<?php echo $GLOBALS['assets_static_relative']; ?>/bootstrap/dist/js/bootstrap.min.js" type="text/javascript"></script>
 <?php echo $tabset->genJavaScript(); ?>
 <script>
 
-$(document).ready(function() {
+$(function() {
   // Initialize support for the tab set.
   twSetup('enctabs');
 });

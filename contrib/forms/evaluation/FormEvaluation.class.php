@@ -1,10 +1,17 @@
 <?php
-
-
 /**
  * class FormEvaluation
  *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @author    Daniel Ehrlich <daniel.ehrlich1@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Daniel Ehrlich <daniel.ehrlich1@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
+
 class FormEvaluation extends ORDataObject
 {
 
@@ -293,7 +300,7 @@ class FormEvaluation extends ORDataObject
                 if (!empty($check)) {
                     $sql = "INSERT INTO form_evaluation_checks set foreign_id= ?, name = ?";
                     sqlQuery($sql, array($this->id, $check));
-                    //echo "$sql<br>";
+                    //echo "$sql<br />";
                 }
             }
         }

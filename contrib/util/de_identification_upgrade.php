@@ -27,6 +27,8 @@ $de_identification_config = 0;
 
 require_once('../../interface/globals.php');
 
+use OpenEMR\Common\Csrf\CsrfUtils;
+
 function tableExists_de($tblname)
 {
     $row = sqlQuery("SHOW TABLES LIKE '" . add_escape_custom($tblname) . "'");
@@ -149,15 +151,15 @@ closedir($dh);
 <title><?php echo xlt('OpenEMR Database Upgrade'); ?></title>
 <link rel='STYLESHEET' href='../../interface/themes/style_sky_blue.css'>
 </head>
-<body> <br>
+<body> <br />
 <center>
 <span class='title'><?php echo xlt('OpenEMR Database Upgrade for De-identification'); ?></span>
-<br>
+<br />
 </center>
 <?php
 if (!empty($_POST['form_submit'])) {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     upgradeFromSqlFile_de("database_de_identification.sql");
@@ -185,7 +187,7 @@ if (!empty($_POST['form_submit'])) {
     }
 
     echo xlt("File privilege granted to OpenEMR user.");
-    echo "<br></font>\n";
+    echo "<br /></font>\n";
 
     echo "<p><font color='green'>";
     echo xlt("Database upgrade finished.");
@@ -221,17 +223,17 @@ function form_validate()
 
 <center>
 <form method='post' action='de_identification_upgrade.php' onsubmit="return form_validate();">
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
-</br>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
+<br />
 <p><?php  if ($de_identification_config != 1) {
     echo "<p><font color='red'>";
     echo xlt("Please set");
     echo " 'de_identification_config' ";
     echo xlt("variable to one to run de-identification upgrade script");
-    echo "</br></br>";
+    echo "<br /><br />";
     echo "([OPENEMR]/contrib/util/de_identification_upgrade.php)";
-} else {
-    echo xlt('Upgrades the OpenEMR database to include Procedures, Functions and tables needed for De-identification process');?></p></br>
+   } else {
+       echo xlt('Upgrades the OpenEMR database to include Procedures, Functions and tables needed for De-identification process');?></p><br />
         <table class="de_id_upgrade_login" align="center">
     <tr><td>&nbsp;</td><td colspan=3 align=center>&nbsp;</td><td>&nbsp;</td></tr>
     <tr valign="top">
@@ -254,7 +256,7 @@ function form_validate()
 
     </table>
 <p><input type='submit' name='form_submit' value="<?php echo xla('Upgrade Database');?>"  /></p>
-<?php } ?>
+    <?php } ?>
 </form>
 </center>
 </body>

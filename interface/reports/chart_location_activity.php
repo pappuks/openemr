@@ -16,8 +16,15 @@ require_once("../globals.php");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/options.inc.php");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 use OpenEMR\Services\PatientService;
+
+if (!empty($_POST)) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+}
 
 $form_patient_id = trim($_POST['form_patient_id']);
 ?>
@@ -27,7 +34,7 @@ $form_patient_id = trim($_POST['form_patient_id']);
 
     <?php Header::setupHeader(); ?>
 
-    <style type="text/css">
+    <style>
     /* specifically include & exclude from printing */
     @media print {
         #report_parameters {
@@ -52,8 +59,8 @@ $form_patient_id = trim($_POST['form_patient_id']);
     }
     </style>
 
-    <script language="JavaScript">
-        $(document).ready(function() {
+    <script>
+        $(function() {
             var win = top.printLogSetup ? top : opener.top;
             win.printLogSetup(document.getElementById('printbutton'));
         });
@@ -96,6 +103,7 @@ if (!empty($ptrow)) {
 </div>
 
 <form name='theform' id='theform' method='post' action='chart_location_activity.php' onsubmit='return top.restoreSession()'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <div id="report_parameters">
 
@@ -107,7 +115,7 @@ if (!empty($ptrow)) {
 
     <table class='text'>
         <tr>
-            <td class='control-label'>
+            <td class='col-form-label'>
                 <?php echo xlt('Patient ID'); ?>:
             </td>
             <td>
@@ -120,17 +128,17 @@ if (!empty($ptrow)) {
     </div>
 
   </td>
-  <td align='left' valign='middle' height="100%">
-    <table style='border-left:1px solid; width:100%; height:100%' >
+  <td class='h-100' align='left' valign='middle'>
+    <table class='w-100 h-100' style='border-left:1px solid;'>
         <tr>
             <td>
                 <div class="text-center">
           <div class="btn-group" role="group">
-                      <a href='#' class='btn btn-default btn-save' onclick='$("#form_refresh").attr("value","true"); $("#theform").submit();'>
+                      <a href='#' class='btn btn-secondary btn-save' onclick='$("#form_refresh").attr("value","true"); $("#theform").submit();'>
                             <?php echo xlt('Submit'); ?>
                       </a>
                         <?php if ($_POST['form_refresh'] || !empty($ptrow)) { ?>
-              <a href='#' class='btn btn-default btn-print' id='printbutton'>
+              <a href='#' class='btn btn-secondary btn-print' id='printbutton'>
                                 <?php echo xlt('Print'); ?>
                         </a>
                         <?php } ?>
@@ -147,38 +155,38 @@ if (!empty($ptrow)) {
 
 <?php
 if ($_POST['form_refresh'] || !empty($ptrow)) {
-?>
+    ?>
 <div id="report_results">
-<table>
-<thead>
+<table class='table'>
+<thead class='thead-light'>
 <th> <?php echo xlt('Time'); ?> </th>
 <th> <?php echo xlt('Destination'); ?> </th>
 </thead>
 <tbody>
-<?php
-$row = array();
-if (!empty($ptrow)) {
-    $res = PatientService::getChartTrackerInformationActivity($curr_pid);
-    while ($row = sqlFetchArray($res)) {
-    ?>
+    <?php
+    $row = array();
+    if (!empty($ptrow)) {
+        $res = PatientService::getChartTrackerInformationActivity($curr_pid);
+        while ($row = sqlFetchArray($res)) {
+            ?>
    <tr>
     <td>
-        <?php echo text(oeFormatDateTime($row['ct_when'], "global", true)); ?>
+            <?php echo text(oeFormatDateTime($row['ct_when'], "global", true)); ?>
   </td>
   <td>
-<?php
-if (!empty($row['ct_location'])) {
-    echo generate_display_field(array('data_type'=>'1','list_id'=>'chartloc'), $row['ct_location']);
-} else if (!empty($row['ct_userid'])) {
-    echo text($row['lname']) . ', ' . text($row['fname']) . ' ' . text($row['mname']);
-}
-?>
+            <?php
+            if (!empty($row['ct_location'])) {
+                echo generate_display_field(array('data_type'=>'1','list_id'=>'chartloc'), $row['ct_location']);
+            } else if (!empty($row['ct_userid'])) {
+                echo text($row['lname']) . ', ' . text($row['fname']) . ' ' . text($row['mname']);
+            }
+            ?>
   </td>
  </tr>
-<?php
-    } // end while
-} // end if
-?>
+            <?php
+        } // end while
+    } // end if
+    ?>
 </tbody>
 </table>
 </div> <!-- end of results -->

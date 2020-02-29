@@ -6,15 +6,21 @@
  * @package   OpenEMR
  * @link      http://www.open-emr.org
  * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2016 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
+
 require_once('../globals.php');
-require_once($GLOBALS['srcdir'] . '/acl.inc');
 require_once($GLOBALS['fileroot'] . '/custom/code_types.inc.php');
 
-if (!acl_check('admin', 'super')) {
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
+if (!AclMain::aclCheckCore('admin', 'super')) {
     die(xlt('Not authorized'));
 }
 
@@ -34,11 +40,11 @@ function applyCode($layoutid, $codetype, $code, $description)
 
 <head>
 <title><?php echo xlt('Install Layout Service Codes'); ?></title>
-<link rel="stylesheet" href='<?php echo $css_header ?>' type='text/css'>
+<?php Header::setupHeader(); ?>
 
 <style type="text/css">
- .dehead { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:bold }
- .detail { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:normal }
+ .dehead { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:bold }
+ .detail { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:normal }
 </style>
 
 </head>
@@ -49,8 +55,8 @@ function applyCode($layoutid, $codetype, $code, $description)
 // Handle uploads.
 if (!empty($_POST['bn_upload'])) {
     //verify csrf
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     $thecodes = array();
@@ -130,7 +136,7 @@ if (!empty($_POST['bn_upload'])) {
 ?>
 <form method='post' action='layout_service_codes.php' enctype='multipart/form-data'
  onsubmit='return top.restoreSession()'>
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <center>
 

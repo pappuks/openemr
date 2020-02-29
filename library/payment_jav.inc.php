@@ -1,5 +1,5 @@
 <?php
-// +-----------------------------------------------------------------------------+ 
+// +-----------------------------------------------------------------------------+
 // Copyright (C) 2010 Z&H Consultancy Services Private Limited <sam@zhservices.com>
 //
 //
@@ -19,9 +19,9 @@
 // openemr/interface/login/GnuGPL.html
 // For more information write to the Free Software
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-// 
+//
 // Author:   Eldho Chacko <eldho@zhservices.com>
-//           Paul Simon K <paul@zhservices.com> 
+//           Paul Simon K <paul@zhservices.com>
 //
 // +------------------------------------------------------------------------------+
 //===============================================================================
@@ -82,9 +82,9 @@ function PayingEntityAction()
         if(document.getElementById('option_insurance_payment'))
             document.getElementById('option_insurance_payment').style.backgroundColor='#DEDEDE';
         if(document.getElementById('option_family_payment'))
-            document.getElementById('option_family_payment').style.backgroundColor='#ffffff';
+            document.getElementById('option_family_payment').style.backgroundColor='var(--white)';
         if(document.getElementById('option_patient_payment'))
-            document.getElementById('option_patient_payment').style.backgroundColor='#ffffff';
+            document.getElementById('option_patient_payment').style.backgroundColor='var(--white)';
     }
     if (newValue=='insurance') {
         if(document.getElementById('option_family_payment'))
@@ -92,7 +92,7 @@ function PayingEntityAction()
         if(document.getElementById('option_patient_payment'))
             document.getElementById('option_patient_payment').style.backgroundColor='#DEDEDE';
         if(document.getElementById('option_insurance_payment'))
-            document.getElementById('option_insurance_payment').style.backgroundColor='#ffffff';
+            document.getElementById('option_insurance_payment').style.backgroundColor='var(--white)';
     }
  }
 function FilterSelection(listSelected) {
@@ -108,7 +108,7 @@ function FilterSelection(listSelected) {
      }
 
     var newValueSelected = (listSelected.options[listSelected.selectedIndex].value);
-    
+
     var list=document.getElementById('type_name');
     var newValue = (list.options[list.selectedIndex].value);
     if (newValue=='patient') {
@@ -162,7 +162,7 @@ function ValidateDateGreaterThanNow(DateValue,DateFormat)
   if(PassedDate > Now)
    return false;
   else
-   return true; 
+   return true;
  }
 function DateCheckGreater(DateValue1,DateValue2,DateFormat)
  {//Checks which date is greater.The 3 formats of date is taken care of.
@@ -318,7 +318,7 @@ function FillAmount()
         <?php
     }
     ?>
-  
+
   TempTotal=0;
   for(RowCount=1;;RowCount++)
    {
@@ -434,7 +434,7 @@ function FormValidations()
         document.getElementById('payment_method').focus();
         return false;
         }
-    <?php
+        <?php
     }
     ?>
    if(document.getElementById('payment_amount').value=='')
@@ -458,7 +458,7 @@ function FormValidations()
         document.getElementById('adjustment_code').focus();
         return false;
        }
-    <?php
+        <?php
     }
     ?>
   if(document.getElementById('type_code').value=='')

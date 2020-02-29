@@ -1,44 +1,34 @@
 <?php
 /**
- *
  * This script add and delete Issues and Encounters relationships.
  *
- * Copyright (C) 2005 Rod Roark <rod@sunsetsystems.com>
- * Copyright (C) 2015 Roberto Vasquez <robertogagliotta@gmail.com>
- * Copyright (C) 2015 Brady Miller <brady.g.miller@gmail.com>
- *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
- * @package OpenEMR
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @author  Roberto Vasquez <robertogagliotta@gmail.com>
- * @author  Brady Miller <brady.g.miller@gmail.com>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Roberto Vasquez <robertogagliotta@gmail.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2005 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2015 Roberto Vasquez <robertogagliotta@gmail.com>
+ * @copyright Copyright (c) 2015-2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
-include_once("../globals.php");
-include_once("$srcdir/patient.inc");
-include_once("$srcdir/acl.inc");
-include_once("$srcdir/lists.inc");
 
+require_once("../globals.php");
+require_once("$srcdir/patient.inc");
+require_once("$srcdir/lists.inc");
+
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
 $patdata = getPatientData($pid, "fname,lname,squad");
 
-$thisauth = ((acl_check('encounters', 'notes', '', 'write') ||
-            acl_check('encounters', 'notes_a', '', 'write')) &&
-            acl_check('patients', 'med', '', 'write'));
+$thisauth = ((AclMain::aclCheckCore('encounters', 'notes', '', 'write') ||
+            AclMain::aclCheckCore('encounters', 'notes_a', '', 'write')) &&
+            AclMain::aclCheckCore('patients', 'med', '', 'write'));
 
-if ($patdata['squad'] && ! acl_check('squads', $patdata['squad'])) {
+if ($patdata['squad'] && ! AclMain::aclCheckCore('squads', $patdata['squad'])) {
      $thisauth = 0;
 }
 
@@ -54,6 +44,10 @@ $endjs = "";    // holds javascript to write at the end
 
 // If the Save button was clicked...
 if ($_POST['form_save']) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+
     $form_pid = $_POST['form_pid'];
     $form_pelist = $_POST['form_pelist'];
     // $pattern = '|/(\d+),(\d+),([YN])|';
@@ -79,7 +73,7 @@ if ($_POST['form_save']) {
     ."<script type=\"text/javascript\" src=\"". $webroot ."/interface/main/tabs/js/include_opener.js\"></script>"
     . "<script language='JavaScript'>\n";
     if ($alertmsg) {
-        echo " alert('" . addslashes($alertmsg) . "');\n";
+        echo " alert(" . js_escape($alertmsg) . ");\n";
     }
 
     echo " var myboss = opener ? opener : parent;\n";
@@ -117,11 +111,11 @@ tr.detail { font-size:10pt; background-color:#eeeeee; }
 // These are the possible colors for table rows.
 var trcolors = new Object();
 // Colors for:            Foreground Background
-trcolors['U'] = new Array('#000000', '#eeeeee'); // unselected
-trcolors['K'] = new Array('#000000', '#eeee00'); // selected key
-// trcolors['Y'] = new Array('#000000', '#99ff99'); // selected value resolved=Y
-// trcolors['N'] = new Array('#000000', '#ff9999'); // selected value resolved=N
-trcolors['V'] = new Array('#000000', '#9999ff'); // selected value
+trcolors['U'] = new Array('var(--black)', '#eeeeee'); // unselected
+trcolors['K'] = new Array('var(--black)', '#eeee00'); // selected key
+// trcolors['Y'] = new Array('var(--black)', '#99ff99'); // selected value resolved=Y
+// trcolors['N'] = new Array('var(--black)', '#ff9999'); // selected value resolved=N
+trcolors['V'] = new Array('var(--black)', '#9999ff'); // selected value
 
 var pselected = new Object();
 var eselected = new Object();
@@ -138,7 +132,7 @@ function refreshIssue(issue, title) {
 // New Issue button is clicked.
 function newIssue() {
  var f = document.forms[0];
- var tmp = (keyid && f.form_key[1].checked) ? ('?enclink=' + keyid) : '';
+ var tmp = (keyid && f.form_key[1].checked) ? ('?enclink=' + encodeURIComponent(keyid)) : '';
  dlgopen('summary/add_edit_issue.php' + tmp, '_blank', 600, 625);
 }
 
@@ -259,7 +253,7 @@ function doclick(pfx, id) {
     if (pfx == 'p') addPair(id, keyid); else addPair(keyid, id);
    }
   } else {
-   alert('<?php echo xls('You must first select an item in the section whose radio button is checked.') ;?>');
+   alert(<?php echo xlj('You must first select an item in the section whose radio button is checked.') ;?>);
   }
  }
 }
@@ -267,8 +261,9 @@ function doclick(pfx, id) {
 </script>
 
 </head>
-<body leftmargin='0' topmargin='0' marginwidth='0' marginheight='0' bgcolor='#ffffff'>
+<body leftmargin='0' topmargin='0' marginwidth='0' marginheight='0' bgcolor='var(--white)'>
 <form method='post' action='problem_encounter.php' onsubmit='return top.restoreSession()'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 <?php
  echo "<input type='hidden' name='form_pid' value='" . attr($pid) . "' />\n";
  // pelist looks like /problem,encounter/problem,encounter/[...].
@@ -276,7 +271,7 @@ function doclick(pfx, id) {
 while ($row = sqlFetchArray($peres)) {
   // echo $row['list_id'] . "," . $row['encounter'] . "," .
   //  ($row['resolved'] ? "Y" : "N") . "/";
-    echo text($row['list_id']) . "," . text($row['encounter']) . "/";
+    echo attr($row['list_id']) . "," . attr($row['encounter']) . "/";
 }
 
  echo "' />\n";
@@ -292,7 +287,7 @@ while ($row = sqlFetchArray($peres)) {
 
  <tr>
   <td align='center' valign='top' style="padding: 0 0 0 5px;">
-   <table class="table table-condensed">
+   <table class="table table-sm">
     <tr class='head'>
      <td colspan='3' align='center'>
       <input type='radio' name='form_key' value='p' onclick='clearall()' checked />
@@ -307,18 +302,18 @@ while ($row = sqlFetchArray($peres)) {
 <?php
 while ($row = sqlFetchArray($pres)) {
     $rowid = $row['id'];
-    echo "    <tr class='detail' id='p_" . attr($rowid) . "' onclick='doclick(\"p\", " . attr(addslashes($rowid)) . ")'>\n";
+    echo "    <tr class='detail' id='p_" . attr($rowid) . "' onclick='doclick(\"p\", " . attr_js($rowid) . ")'>\n";
     echo "     <td valign='top'>" . text($ISSUE_TYPES[($row['type'])][1]) . "</td>\n";
     echo "     <td valign='top'>" . text($row['title']) . "</td>\n";
     echo "     <td valign='top'>" . text($row['comments']) . "</td>\n";
     echo "    </tr>\n";
-    $endjs .= "pselected['" . attr($rowid) . "'] = '';\n";
+    $endjs .= "pselected[" . js_escape($rowid) . "] = '';\n";
 }
 ?>
    </table>
   </td>
   <td align='center' valign='top' style="padding: 0 5px 0 0;">
-   <table class="table table-condensed">
+   <table class="table table-sm">
     <tr class='head'>
      <td colspan='2' align='center'>
       <input type='radio' name='form_key' value='e' onclick='clearall()' />
@@ -332,11 +327,11 @@ while ($row = sqlFetchArray($pres)) {
 <?php
 while ($row = sqlFetchArray($eres)) {
     $rowid = $row['encounter'];
-    echo "    <tr class='detail' id='e_" . attr($rowid) . "' onclick='doclick(\"e\", " . attr(addslashes($rowid)) . ")'>\n";
+    echo "    <tr class='detail' id='e_" . attr($rowid) . "' onclick='doclick(\"e\", " . attr_js($rowid) . ")'>\n";
     echo "     <td valign='top'>" . text(substr($row['date'], 0, 10)) . "</td>\n";
     echo "     <td valign='top'>" . text($row['reason']) . "</td>\n";
     echo "    </tr>\n";
-    $endjs .= "eselected['" . attr($rowid) . "'] = '';\n";
+    $endjs .= "eselected[" . js_escape($rowid) . "] = '';\n";
 }
 ?>
    </table>
@@ -345,9 +340,9 @@ while ($row = sqlFetchArray($eres)) {
 
  <tr>
   <td colspan='2' align='center'>
-   <input type='submit' name='form_save' value='<?php echo xla('Save'); ?>' disabled /> &nbsp;
-   <input type='button' value='<?php echo xla('Add Issue'); ?>' onclick='newIssue()' />
-   <input type='button' value='<?php echo xla('Cancel'); ?>' onclick='dlgclose()' />
+   <input type='submit' class='btn btn-secondary btn-sm btn-save' name='form_save' value='<?php echo xla('Save'); ?>' disabled /> &nbsp;
+   <input type='button' class='btn btn-primary btn-sm' value='<?php echo xla('Add Issue'); ?>' onclick='newIssue()' />
+   <button  class='btn btn-link btn-cancel' onclick='dlgclose()'><?php echo xla('Cancel'); ?></button>
   </td>
  </tr>
 
@@ -355,20 +350,18 @@ while ($row = sqlFetchArray($eres)) {
 
 </form>
 
-<p><b><?php echo xlt('Instructions:'); ?></b> <?php echo xlt('Choose a section and click an item within it; then in
-the other section you will see the related items highlighted, and you can click
-in that section to add and delete relationships.'); ?>
+<p><b><?php echo xlt('Instructions:'); ?></b> <?php echo xlt('Choose a section and click an item within it; then in the other section you will see the related items highlighted, and you can click in that section to add and delete relationships.'); ?>
 </p>
 
 <script>
 <?php
  echo $endjs;
 if ($_REQUEST['issue']) {
-    echo "doclick('p', " . attr(addslashes($_REQUEST['issue'])) . ");\n";
+    echo "doclick('p', " . js_escape($_REQUEST['issue']) . ");\n";
 }
 
 if ($alertmsg) {
-    echo "alert('" . addslashes($alertmsg) . "');\n";
+    echo "alert(" . js_escape($alertmsg) . ");\n";
 }
 ?>
 </script>

@@ -1,31 +1,22 @@
 <?php
 /**
-* Encounter form to track any clinical parameter.
-*
-* Copyright (C) 2014 Joe Slam <joe@produnis.de>
-*
-* LICENSE: This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-* You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>.
-*
-* @package OpenEMR
-* @author Joe Slam <joe@produnis.de>
-* @link http://www.open-emr.org
-*/
-
-// initial stuff
-//---------------
+ * Encounter form to track any clinical parameter.
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Joe Slam <trackanything@produnis.de>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2014 Joe Slam <trackanything@produnis.de>
+ * @copyright Copyright (c) 2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
 
-require_once("../../globals.php");
-include_once($GLOBALS["srcdir"] . "/api.inc");
+require_once(__DIR__ . "/../../globals.php");
+require_once($GLOBALS["srcdir"] . "/api.inc");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 $returnurl = 'encounter_top.php';
 if (!$formid) {
@@ -71,8 +62,6 @@ $globalplot_c   = array();  # flag if global plot-button is shown
 $track_count    = 0;        # counts tracks and generates div-ids
 //-----------end setup vars
 
-
-
 echo "<html><head>";
 // Javascript support and Javascript-functions
 //******* **********************************
@@ -80,11 +69,10 @@ echo "<html><head>";
 
 <?php require $GLOBALS['srcdir'] . '/js/xl/dygraphs.js.php'; ?>
 
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
-<link rel="stylesheet" href="style.css" type="text/css">
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/modified/dygraphs-2-0-0/dygraph.css" type="text/css"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-1-3-2/jquery.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/modified/dygraphs-2-0-0/dygraph.js?v=<?php echo $v_js_includes; ?>"></script>
+<?php Header::setupHeader('dygraphs'); ?>
+
+<link rel="stylesheet" href="style.css" type="text/css" />
+
 <script type="text/javascript">
 //-------------- checkboxes checked checker --------------------
 // Pass the checkbox name to the function
@@ -113,7 +101,8 @@ function plot_graph(checkedBoxes, theitems, thetrack, thedates, thevalues, track
                      values: thevalues,
                      items:  theitems,
                      track:  thetrack,
-                     thecheckboxes: checkedBoxes
+                     thecheckboxes: checkedBoxes,
+                     csrf_token_form: <?php echo js_escape(CsrfUtils::collectCsrfToken()); ?>
                    },
              dataType: "json",
              success: function(returnData){
@@ -172,12 +161,12 @@ echo "<input type='hidden' name='fromencounter' value='" . attr($fromencounter) 
 // go to encounter or go to demographics
 //---------------------------------------------
 if ($fromencounter == 1) {
-    echo "<td>&nbsp;&nbsp;&nbsp;<a class='css_button' href='".$GLOBALS['webroot'] . "/interface/patient_file/encounter/$returnurl' onclick='top.restoreSession()'><span>".xlt('Back to encounter')."</span></a></td>";
+    echo "<td>&nbsp;&nbsp;&nbsp;<a class='btn btn-primary' href='".$GLOBALS['webroot'] . "/interface/patient_file/encounter/$returnurl' onclick='top.restoreSession()'><span>".xlt('Back to encounter')."</span></a></td>";
 }
 
 if ($fromencounter == 0) {
     echo "<td>&nbsp;&nbsp;&nbsp;<a href='../../patient_file/summary/demographics.php' ";
-    echo " class='css_button' onclick='top.restoreSession()'>";
+    echo " class='btn btn-primary' onclick='top.restoreSession()'>";
     echo "<span>" . xlt('Back to Patient') . "</span></a></td>";
 }
 
@@ -232,7 +221,7 @@ while ($myrow = sqlFetchArray($query)) {
     $date_local     = array();  # (collects items' datetime for local row)
     $value_local    = array();  # (collects item's values [local array])
     $localplot_c    = array(); // counter to decide if graph-button is shown
-    $shownameflag   = 0; // show table-head	?
+    $shownameflag   = 0; // show table-head ?
     $localplot      = 0; // show graph-button?
     $col            = 0; // how many Items per row
     $row_lc         = 0; // local row counter
@@ -240,9 +229,9 @@ while ($myrow = sqlFetchArray($query)) {
 
 
     // get every single tracks
-    echo "<div id='graph" . attr($track_count) . "' class='chart-dygraphs'> </div><br>"; // here goes the graph
+    echo "<div id='graph" . attr($track_count) . "' class='chart-dygraphs'> </div><br />"; // here goes the graph
     echo "<small>[" . xlt('Data from') . " ";
-    echo "<a href='../../patient_file/encounter/encounter_top.php?set_encounter=" . attr($the_encounter) . "' target='RBot'>" . xlt('encounter') . " #" . text($the_encounter) . "</a>]";
+    echo "<a href='../../patient_file/encounter/encounter_top.php?set_encounter=" . attr_url($the_encounter) . "' target='RBot'>" . xlt('encounter') . " #" . text($the_encounter) . "</a>]";
     echo "</small>";
     echo "<table border='1'>";
     $spell2  = "SELECT DISTINCT track_timestamp ";
@@ -346,7 +335,7 @@ while ($myrow = sqlFetchArray($query)) {
     }
 
     if ($localplot > 0 && $globalplot > 0) {
-            echo "<br>";
+            echo "<br />";
     }
 
     if ($globalplot > 0) {
@@ -356,12 +345,12 @@ while ($myrow = sqlFetchArray($query)) {
     echo "</td>";
     echo "</tr>";
     echo "</table>";
-    echo "<br><hr>";
+    echo "<br /><hr>";
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // onClick create graph javascript method
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-?>
+    ?>
 <script type="text/javascript">
 function get_my_graph<?php echo attr($track_count); ?>(where){
     top.restoreSession();
@@ -382,7 +371,7 @@ function get_my_graph<?php echo attr($track_count); ?>(where){
     plot_graph(checkedBoxes, theitems, thetrack, thedates, thevalues, <?php echo attr($track_count); ?>);
 }
 </script>
-<?php
+    <?php
 // ~~~~~~~~~~~~~~~~~ / end javascript method ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 } // end while get all trackdata
@@ -420,13 +409,13 @@ echo "<input type='hidden' name='fromencounter' value='" . attr($fromencounter) 
 // go to encounter or go to demographics
 //---------------------------------------------
 if ($fromencounter == 1) {
-    echo "<td>&nbsp;&nbsp;&nbsp;<a class='css_button' href='".$GLOBALS['webroot'] . "/interface/patient_file/encounter/$returnurl' onclick='top.restoreSession()'><span>".xlt('Back to encounter')."</span></a></td>";
+    echo "<td>&nbsp;&nbsp;&nbsp;<a class='btn btn-primary' href='".$GLOBALS['webroot'] . "/interface/patient_file/encounter/$returnurl' onclick='top.restoreSession()'><span>".xlt('Back to encounter')."</span></a></td>";
 }
 
 if ($fromencounter == 0) {
     echo "<td>&nbsp;&nbsp;&nbsp;<a href='../../patient_file/summary/demographics.php' ";
-    echo " class='css_button' onclick='top.restoreSession()'>";
-    echo "<span>" . htmlspecialchars(xl('Back to Patient'), ENT_NOQUOTES) . "</span></a></td>";
+    echo " class='btn btn-primary' onclick='top.restoreSession()'>";
+    echo "<span>" . xlt('Back to Patient') . "</span></a></td>";
 }
 
 //---------------------------------------------

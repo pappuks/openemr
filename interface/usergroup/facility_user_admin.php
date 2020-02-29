@@ -2,24 +2,25 @@
 /**
  * edit per-facility user information.
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Scott Wakefield <scott@npclinics.com.au>
- * @author  Brady Miller <brady.g.miller@gmail.com>
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Scott Wakefield <scott@npclinics.com.au>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2012 NP Clinics <info@npclinics.com.au>
  * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
- * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
 require_once("../globals.php");
 require_once("$srcdir/options.inc.php");
-require_once("$srcdir/acl.inc");
 
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
 // Ensure authorized
-if (!acl_check('admin', 'users')) {
+if (!AclMain::aclCheckCore('admin', 'users')) {
     die(xlt("Unauthorized"));
 }
 
@@ -38,7 +39,7 @@ if (!isset($_GET["user_id"]) || !isset($_GET["fac_id"])) {
     <?php Header::setupHeader(['common','jquery-ui','datetime-picker','opener']); ?>
 
     <script language="JavaScript">
-        $(document).ready(function(){
+        $(function(){
             $("#form_facility_user").submit(function (event) {
                 top.restoreSession();
                 event.preventDefault();
@@ -96,7 +97,7 @@ if (!isset($_GET["user_id"]) || !isset($_GET["fac_id"])) {
 
     <div class="container">
         <div class="row">
-            <div class="col-xs-12">
+            <div class="col-12">
                 <div class="page-title">
                     <h3><?php echo xlt('Edit Facility Specific User Information'); ?></h3>
                 </div>
@@ -104,6 +105,7 @@ if (!isset($_GET["user_id"]) || !isset($_GET["fac_id"])) {
         </div>
         <div class="row">
             <form name='form_facility_user' id='form_facility_user' method='post' action="facility_user.php">
+                <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
                 <input type=hidden name=mode value="facility_user_id">
                 <input type=hidden name=user_id value="<?php echo attr($_GET["user_id"]);?>">
                 <input type=hidden name=fac_id value="<?php echo attr($_GET["fac_id"]);?>">
@@ -143,7 +145,7 @@ if (!isset($_GET["user_id"]) || !isset($_GET["fac_id"])) {
                     <tr>
                         <td>&nbsp;</td>
                         <td>
-                            <button type="submit" class="btn btn-default btn-save" name='form_save' id='form_save' href='#' >
+                            <button type="submit" class="btn btn-secondary btn-save" name='form_save' id='form_save' href='#' >
                                 <?php echo xlt('Save');?>
                             </button>
                             <a class="btn btn-link btn-cancel oe-opt-btn-separate-left" id='cancel' href='#'>

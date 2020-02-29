@@ -1,6 +1,6 @@
 <?php
 /************************************************************************
-  			phone_number.php - Copyright duhlman
+            phone_number.php - Copyright duhlman
 
 /usr/share/apps/umbrello/headings/heading.php
 
@@ -48,17 +48,20 @@ class PhoneNumber extends ORDataObject
 
     static function factory_phone_numbers($foreign_id = "")
     {
+        $sqlArray = array();
+
         if (empty($foreign_id)) {
-             $foreign_id= "like '%'";
+            $foreign_id_sql = " like '%'";
         } else {
-            $foreign_id= " = '" . add_escape_custom(strval($foreign_id)) . "'";
+            $foreign_id_sql = " = ?";
+            $sqlArray[] = strval($foreign_id);
         }
 
         $phone_numbers = array();
         $p = new PhoneNumber();
-        $sql = "SELECT id FROM  " . $p->_table . " WHERE foreign_id " .$foreign_id . " ORDER BY type";
+        $sql = "SELECT id FROM " . escape_table_name($p->_table) . " WHERE foreign_id " . $foreign_id_sql . " ORDER BY type";
         //echo $sql . "<bR />";
-        $results = sqlQ($sql);
+        $results = sqlQ($sql, $sqlArray);
         //echo "sql: $sql";
         while ($row = sqlFetchArray($results)) {
             $phone_numbers[] = new PhoneNumber($row['id']);
@@ -207,5 +210,5 @@ $p = new PhoneNumber(true);
 
 $ps = PhoneNumber::factory_phone_numbers(55);
 foreach($ps as $p) {
-	echo $p->toString(true);
+    echo $p->toString(true);
 }*/

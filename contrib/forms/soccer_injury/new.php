@@ -18,9 +18,11 @@
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
 
-include_once("../../globals.php");
-include_once("$srcdir/api.inc");
-include_once("$srcdir/forms.inc");
+require_once("../../globals.php");
+require_once("$srcdir/api.inc");
+require_once("$srcdir/forms.inc");
+
+use OpenEMR\Core\Header;
 
 $row = array();
 
@@ -35,7 +37,7 @@ function rbvalue($rbname)
         $tmp = '0';
     }
 
-    return "'$tmp'";
+    return $tmp;
 }
 
 function cbvalue($cbname)
@@ -46,12 +48,12 @@ function cbvalue($cbname)
 function rbinput($name, $value, $desc, $colname)
 {
     global $row;
-    $ret  = "<input type='radio' name='$name' value='$value'";
+    $ret  = "<input type='radio' name='" . attr($name) . "' value='" . attr($value) . "'";
     if ($row[$colname] == $value) {
         $ret .= " checked";
     }
 
-    $ret .= " />$desc";
+    $ret .= " />" . text($desc);
     return $ret;
 }
 
@@ -63,7 +65,7 @@ function rbcell($name, $value, $desc, $colname)
 function cbinput($name, $colname)
 {
     global $row;
-    $ret  = "<input type='checkbox' name='$name' value='1'";
+    $ret  = "<input type='checkbox' name='" . attr($name) . "' value='1'";
     if ($row[$colname]) {
         $ret .= " checked";
     }
@@ -104,39 +106,40 @@ if ($_POST['bn_save']) {
  // If updating an existing form...
  //
     if ($formid) {
-        $query = "UPDATE form_soccer_injury SET "      .
-         "siinjtime = '$siinjtime', "                  .
-         "sigametime = "  . rbvalue('gameplay') . ", " .
-         "simechanism = " . rbvalue('activity') . ", " .
-         "simech_other = '$simech_other', "            .
-         "sisurface = "   . rbvalue('surface')  . ", " .
-         "siposition = "  . rbvalue('position') . ", " .
-         "sifootwear = "  . rbvalue('footwear') . ", " .
-         "siequip_1 = "   . cbvalue('equip_1')  . ", " .
-         "siequip_2 = "   . cbvalue('equip_2')  . ", " .
-         "siequip_3 = "   . cbvalue('equip_3')  . ", " .
-         "siequip_4 = "   . cbvalue('equip_4')  . ", " .
-         "siequip_5 = "   . cbvalue('equip_5')  . ", " .
-         "siequip_6 = "   . cbvalue('equip_6')  . ", " .
-         "siside = "      . rbvalue('side')     . ", " .
-         "siremoved = "   . rbvalue('removed')  . ", " .
-         "sitreat_1 = "   . cbvalue('treat_1')  . ", " .
-         "sitreat_2 = "   . cbvalue('treat_2')  . ", " .
-         "sitreat_3 = "   . cbvalue('treat_3')  . ", " .
-         "sitreat_4 = "   . cbvalue('treat_4')  . ", " .
-         "sitreat_5 = "   . cbvalue('treat_5')  . ", " .
-         "sitreat_6 = "   . cbvalue('treat_6')  . ", " .
-         "sitreat_7 = "   . cbvalue('treat_7')  . ", " .
-         "sitreat_8 = "   . cbvalue('treat_8')  . ", " .
-         "sitreat_9 = "   . cbvalue('treat_9')  . ", " .
-         "sitreat_10 = "  . cbvalue('treat_10') . ", " .
-         "sitreat_other = '$sitreat_other', "          .
-         "sinoreturn = "  . cbvalue('noreturn') . " "  .
-         "WHERE id = '$formid'";
-        sqlStatement($query);
-    } // If adding a new form...
- //
-    else {
+        $query = "UPDATE form_soccer_injury SET
+         siinjtime = ?,
+         sigametime = ?,
+         simechanism  ?,
+         simech_other= ?,
+         sisurface =  ?,
+         siposition = ?,
+         sifootwear = ?,
+         siequip_1 =  ?,
+         siequip_2 =  ?,
+         siequip_3 =  ?,
+         siequip_4 =  ?,
+         siequip_5 =  ?,
+         siequip_6 =  ?,
+         siside =    ?,
+         siremoved =  ?,
+         sitreat_1 =  ?,
+         sitreat_2 =  ?,
+         sitreat_3 =  ?,
+         sitreat_4 =  ?,
+         sitreat_5 =  ?,
+         sitreat_6 =  ?,
+         sitreat_7 =  ?,
+         sitreat_8 =  ?,
+         sitreat_9 =  ?,
+         sitreat_10 = ?,
+         sitreat_other = ?,
+         sinoreturn = ?,
+         WHERE id = ?";
+        sqlStatement($query, array( $siinjtime, rbvalue('gameplay'), rbvalue('activity'), $simech_other, rbvalue('surface'), rbvalue('position'), rbvalue('footwear'), cbvalue('equip_1'),
+        cbvalue('equip_2'), cbvalue('equip_3'), cbvalue('equip_4'), cbvalue('equip_5'), cbvalue('equip_6'), rbvalue('side'), rbvalue('removed'), cbvalue('treat_1'), cbvalue('treat_2'),
+        cbvalue('treat_3'), cbvalue('treat_4'), cbvalue('treat_5'), cbvalue('treat_6'), cbvalue('treat_7'), cbvalue('treat_8'), cbvalue('treat_9'), cbvalue('treat_10'), $sistreat_other, cbvalue('noreturn'),
+        $formid));
+    } else { // If adding a new form...
         $query = "INSERT INTO form_soccer_injury ( " .
          "siinjtime, sigametime, simechanism, simech_other, sisurface, " .
          "siposition, sifootwear, " .
@@ -145,36 +148,14 @@ if ($_POST['bn_save']) {
          "sitreat_1, sitreat_2, sitreat_3, sitreat_4, sitreat_5, " .
          "sitreat_6, sitreat_7, sitreat_8, sitreat_9, sitreat_10, " .
          "sitreat_other, sinoreturn " .
-         ") VALUES ( " .
-         "'$siinjtime', " .
-         rbvalue('gameplay') . ", " .
-         rbvalue('activity') . ", " .
-         "'$simech_other', "        .
-         rbvalue('surface')  . ", " .
-         rbvalue('position') . ", " .
-         rbvalue('footwear') . ", " .
-         cbvalue('equip_1')  . ", " .
-         cbvalue('equip_2')  . ", " .
-         cbvalue('equip_3')  . ", " .
-         cbvalue('equip_4')  . ", " .
-         cbvalue('equip_5')  . ", " .
-         cbvalue('equip_6')  . ", " .
-         rbvalue('side')     . ", " .
-         rbvalue('removed')  . ", " .
-         cbvalue('treat_1')  . ", " .
-         cbvalue('treat_2')  . ", " .
-         cbvalue('treat_3')  . ", " .
-         cbvalue('treat_4')  . ", " .
-         cbvalue('treat_5')  . ", " .
-         cbvalue('treat_6')  . ", " .
-         cbvalue('treat_7')  . ", " .
-         cbvalue('treat_8')  . ", " .
-         cbvalue('treat_9')  . ", " .
-         cbvalue('treat_10') . ", " .
-         "'$sitreat_other', "       .
-         cbvalue('noreturn') . " "  .
-         ")";
-        $newid = sqlInsert($query);
+         ") VALUES ( ?,?,?,?,?,?,?,?,?,?,?,?,
+         ?,?,?,?,?,?,?,?,?,?,?,?,
+         ?,?,?)";
+
+        $newid = sqlInsert($query, array($siinjtime, rbvalue('gameplay'), rbvalue('activity'), $simech_other, rbvalue('surface'), rbvalue('position'), rbvalue('footwear'), cbvalue('equip_1'),
+        cbvalue('equip_2'), cbvalue('equip_3'), cbvalue('equip_4'), cbvalue('equip_5'), cbvalue('equip_6'), rbvalue('side'), rbvalue('removed'), cbvalue('treat_1'), cbvalue('treat_2'),
+        cbvalue('treat_3'), cbvalue('treat_4'), cbvalue('treat_5'), cbvalue('treat_6'), cbvalue('treat_7'), cbvalue('treat_8'), cbvalue('treat_9'), cbvalue('treat_10'), $sistreat_other, cbvalue('noreturn')));
+
         addForm($encounter, "Football Injury", $newid, "soccer_injury", $pid, $userauthorized);
     }
 
@@ -188,7 +169,7 @@ $siinjtime = '';
 $siampm = '';
 if ($formid) {
     $row = sqlQuery("SELECT * FROM form_soccer_injury WHERE " .
-    "id = '$formid' AND activity = '1'") ;
+    "id = ? AND activity = '1'", array($formid)) ;
     $siinjtime = substr($row['siinjtime'], 0, 5);
     $siampm = 'am';
     $siinjhour = substr($siinjtime, 0, 2);
@@ -200,8 +181,7 @@ if ($formid) {
 ?>
 <html>
 <head>
-<?php html_header_show();?>
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
+    <?php Header::setupHeader(); ?>
 <style>
 .billcell { font-family: sans-serif; font-size: 10pt }
 </style>
@@ -211,7 +191,7 @@ if ($formid) {
 </head>
 
 <body class="body_top">
-<form method="post" action="<?php echo $rootdir ?>/forms/soccer_injury/new.php?id=<?php echo $formid ?>"
+<form method="post" action="<?php echo $rootdir ?>/forms/soccer_injury/new.php?id=<?php echo attr_url($formid); ?>"
  onsubmit="return top.restoreSession()">
 
 <center>
@@ -227,13 +207,13 @@ if ($formid) {
  <tr>
   <td nowrap>Time</td>
   <td nowrap>
-   <input type='text' name='time' size='5' title='Hour or hh:mm' value='<?php echo $siinjtime ?>' />&nbsp;
+   <input type='text' name='time' size='5' title='Hour or hh:mm' value='<?php echo attr($siinjtime); ?>' />&nbsp;
    <input type='radio' name='timeampm' value='am'<?php if ($siampm == 'am') {
         echo ' checked';
-} ?> />am&nbsp;
+                                                 } ?> />am&nbsp;
    <input type='radio' name='timeampm' value='pm'<?php if ($siampm == 'pm') {
         echo ' checked';
-} ?> />pm&nbsp;
+                                                 } ?> />pm&nbsp;
   </td>
  </tr>
 
@@ -292,7 +272,7 @@ if ($formid) {
         <?php echo rbinput('activity', '7', 'Other:', 'simechanism') ?>
       <input type='text' name='activity_other' size='10'
        title='Describe other'
-       value='<?php echo addslashes($row['simech_other']) ?>' />
+       value='<?php echo attr($row['simech_other']) ?>' />
      </td>
     </tr>
    </table>
@@ -326,7 +306,7 @@ if ($formid) {
         <?php echo rbinput('activity', '23', 'Other:', 'simechanism') ?>
       <input type='text' name='activity_nc_other' size='10'
        title='Describe other'
-       value='<?php echo addslashes($row['simech_other']) ?>' />
+       value='<?php echo attr($row['simech_other']) ?>' />
      </td>
     </tr>
    </table>
@@ -436,7 +416,7 @@ if ($formid) {
  </tr>
 
  <tr>
-  <td nowrap>Removed from<br>Play/Training<br>after Injury</td>
+  <td nowrap>Removed from<br />Play/Training<br />after Injury</td>
   <td nowrap>
    <table width='100%'>
     <tr>
@@ -450,7 +430,7 @@ if ($formid) {
  </tr>
 
  <tr>
-  <td nowrap>Medical Treatment<br>Sought from</td>
+  <td nowrap>Medical Treatment<br />Sought from</td>
   <td nowrap>
    <table width='100%'>
     <tr>
@@ -471,7 +451,7 @@ if ($formid) {
         <?php echo cbinput('treat_10', 'sitreat_10') ?>Other:
       <input type='text' name='treat_other' size='10'
        title='Describe other'
-       value='<?php echo addslashes($row['sitreat_other']) ?>' />
+       value='<?php echo attr($row['sitreat_other']) ?>' />
      </td>
     </tr>
    </table>

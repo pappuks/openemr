@@ -12,7 +12,14 @@
 
 require_once("../globals.php");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
+
+if (!empty($_POST)) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+}
 ?>
 
 <html>
@@ -44,7 +51,7 @@ if (isset($_POST['lognext']) && $_POST['lognext']) {
         display: inline;
     }
     #report_results table {
-       margin-top: 0px;
+       margin-top: 0;
     }
 }
 
@@ -64,20 +71,21 @@ if (isset($_POST['lognext']) && $_POST['lognext']) {
 <span class='title'><?php echo xlt('Direct Message Log'); ?></span>
 
 <form method='post' name='theform' id='theform' action='direct_message_log.php' onsubmit='return top.restoreSession()'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 <input type='hidden' name='lognext' id='lognext' value=''>
 
 <div id="report_parameters">
     <table>
         <tr>
             <td width='470px'>
-                <div class="btn-group pull-left" role="group">
-                    <a id='refresh_button' href='#' class='btn btn-default btn-refresh' onclick='top.restoreSession(); $("#theform").submit()'>
+                <div class="btn-group float-left" role="group">
+                    <a id='refresh_button' href='#' class='btn btn-secondary btn-refresh' onclick='top.restoreSession(); $("#theform").submit()'>
                         <?php echo xlt('Refresh'); ?>
                     </a>
-                    <a id='prev_button' href='#' class='btn btn-default btn-transmit' onclick='top.restoreSession(); $("#lognext").val(-100); $("#theform").submit()'>
+                    <a id='prev_button' href='#' class='btn btn-secondary btn-transmit' onclick='top.restoreSession(); $("#lognext").val(-100); $("#theform").submit()'>
                         <?php echo xlt('Older'); ?>
                     </a>
-                    <a id='next_button' href='#' class='btn btn-default btn-transmit' onclick='top.restoreSession(); $("#lognext").val(100); $("#theform").submit()'>
+                    <a id='next_button' href='#' class='btn btn-secondary btn-transmit' onclick='top.restoreSession(); $("#lognext").val(100); $("#theform").submit()'>
                         <?php echo xlt('Newer'); ?>
                     </a>
                 </div>
@@ -86,14 +94,14 @@ if (isset($_POST['lognext']) && $_POST['lognext']) {
     </table>
 </div>  <!-- end of search parameters -->
 
-<br>
+<br />
 
 
 
 <div id="report_results">
-<table>
+<table class='table'>
 
- <thead>
+ <thead class='thead-light'>
 
   <th align='center'>
     <?php echo xlt('ID'); ?>
@@ -141,7 +149,7 @@ while ($row = sqlFetchArray($res)) {
     if (!$logstart) {
         $logstart = $row['id'];
     }
-?>
+    ?>
 <tr>
     <td align='center'><?php echo text($row['id']); ?></td>
 
@@ -174,14 +182,14 @@ while ($row = sqlFetchArray($res)) {
     <td align='center'><?php echo text($row['status_ts']); ?></td>
 
 </tr>
-<?php
+    <?php
 } // $row = sqlFetchArray($res) while
 ?>
 </tbody>
 </table>
 </div>  <!-- end of search results -->
 
-<input type='hidden' name='logstart' id='logstart' value='<?php echo text($logstart); ?>'>
+<input type='hidden' name='logstart' id='logstart' value='<?php echo attr($logstart); ?>'>
 </form>
 
 </body>

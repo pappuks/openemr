@@ -13,10 +13,12 @@
 
 
 require_once("../globals.php");
-require_once("$srcdir/log.inc");
-require_once("$srcdir/acl.inc");
 require_once("$srcdir/options.inc.php");
 require_once("portal.inc.php");
+
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 /**
  * Get a list item title, translating if required.
@@ -85,7 +87,7 @@ function patientNameFromLogin($login)
 }
 
 // Check authorization.
-$thisauth = acl_check('patients', 'med');
+$thisauth = AclMain::aclCheckCore('patients', 'med');
 if (!$thisauth) {
     die(xlt('Not authorized'));
 }
@@ -115,10 +117,8 @@ if (!empty($_POST['bn_delete'])) {
 ?>
 <html>
 <head>
-<?php html_header_show();?>
 
-<link rel="stylesheet" href='<?php  echo $css_header ?>' type='text/css'>
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.min.css">
+    <?php Header::setupHeader('datetime-picker'); ?>
 
 <title><?php echo xlt('Portal Requests'); ?></title>
 
@@ -129,11 +129,6 @@ tr.detail { font-size:10pt; }
 a, a:visited, a:hover { color:#0000cc; }
 
 </style>
-
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery/dist/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
-<script type="text/javascript" src="../../library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
-<script type="text/javascript" src="../../library/textformat.js?v=<?php echo $v_js_includes; ?>"></script>
 
 <script language="JavaScript">
 
@@ -152,7 +147,7 @@ function openRequest(postid, type) {
  //
  // To open results in the same frame:
  if (type.indexOf('Demographics') == 0) {
-  document.location.href = 'patient_select.php?postid=' + postid + '&csrf_token_form=<?php echo attr(urlencode(collectCsrfToken())); ?>';
+  document.location.href = 'patient_select.php?postid=' + postid + '&csrf_token_form=<?php echo attr_url(CsrfUtils::collectCsrfToken()); ?>';
  } else
  if (type.indexOf('Insurance') == 0) {
   document.location.href = 'insurance_form.php?postid=' + postid;
@@ -188,7 +183,7 @@ function openMessage(messageid) {
  document.location.href = 'upload_form.php?messageid=' + messageid;
 }
 
-$(document).ready(function() {
+$(function() {
     $('.datepicker').datetimepicker({
         <?php $datetimepicker_timepicker = false; ?>
         <?php $datetimepicker_showseconds = false; ?>
@@ -235,7 +230,7 @@ if ($result['errmsg']) {
     value='<?php echo attr($form_from_date); ?>'
     title='<?php echo xla('yyyy-mm-dd'); ?>' />
    &nbsp;
-    <?php echo xlt('To'); ?>:
+    <?php echo xlt('To{{Range}}'); ?>:
    <input type='text' size='8' class='datepicker' name='form_to_date' id='form_to_date'
     value='<?php echo attr($form_to_date); ?>'
     title='<?php echo xla('yyyy-mm-dd'); ?>' />

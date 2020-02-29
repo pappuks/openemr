@@ -24,7 +24,7 @@
  *
  * @package OpenEMR
  * @author  Brady Miller <brady.g.miller@gmail.com>
- * @link    http://www.open-emr.org
+ * @link    https://www.open-emr.org
  */
 
 /**
@@ -32,6 +32,9 @@
  */
 require_once(dirname(__FILE__) . "/clinical_rules.php");
 require_once(dirname(__FILE__) . "/maviq_phone_api.php");
+
+//only used in commented out code
+use OpenEMR\Common\Crypto\CryptoGen;
 
 /**
  * Display the patient reminder widget.
@@ -53,7 +56,7 @@ function patient_reminder_widget($patient_id, $dateTarget = '')
 
     if (empty($listReminders)) {
         // No reminders to show.
-        echo htmlspecialchars(xl('No active patient reminders.'), ENT_NOQUOTES);
+        echo xlt('No active patient reminders.');
         return;
     }
 
@@ -69,9 +72,9 @@ function patient_reminder_widget($patient_id, $dateTarget = '')
         echo "</span></td><td style='padding:0 1em 0 1em;'><span class='small'>";
         // show reminder sent date
         if (empty($reminder['date_sent'])) {
-            echo htmlspecialchars(xl('Reminder Not Sent Yet'), ENT_NOQUOTES);
+            echo xlt('Reminder Not Sent Yet');
         } else {
-            echo htmlspecialchars(xl('Reminder Sent On').": ".$reminder['date_sent'], ENT_NOQUOTES);
+            echo text(xl('Reminder Sent On').": ".$reminder['date_sent']);
         }
 
         echo "</span></td></tr>";
@@ -295,7 +298,7 @@ function update_reminders($dateTarget = '', $patient_id = '', $start = null, $ba
             if (($row['pid'] == $reminder['pid']) &&
                ($row['category'] == $reminder['category']) &&
                ($row['item'] == $reminder['item']) &&
-               ($row['due_status'] == $reminder['due_status']) ) {
+               ($row['due_status'] == $reminder['due_status'])) {
                 // The sql reminder has been confirmed, so do not inactivate it
                 $inactivateFlag = false;
                 break;
@@ -391,7 +394,8 @@ function send_reminders()
     *     //  feature has been commented out for now.
     *     // Automated VOIP service provided by Maviq. Please visit http://signup.maviq.com for more information.
     *      $siteId = $GLOBALS['phone_gateway_username'];
-    *      $token = $GLOBALS['phone_gateway_password'];
+    *      $cryptoGen = new CryptoGen();
+    *      $token = $cryptoGen->decryptStandard($GLOBALS['phone_gateway_password']);
     *      $endpoint = $GLOBALS['phone_gateway_url'];
     *      $client = new MaviqClient($siteId, $token, $endpoint);
     *      //Set up params.

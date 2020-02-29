@@ -32,33 +32,31 @@
  *     show invoice number
  * </pre>
  *
- * Copyright (C) 2006-2016 Rod Roark <rod@sunsetsystems.com>
- * Copyright (C) 2017 Brady Miller <brady.g.miller@gmail.com>
- *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
- * @package OpenEMR
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @author  Brady Miller <brady.g.miller@gmail.com>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @author    Ranganath Pathak <pathak@scrs1.org>
+ * @author    Jerry Padgett <sjpadgett@gmail.com>
+ * @author    Stephen Waite <stephen.waite@cmsvt.com>
+ * @copyright Copyright (c) 2006-2017 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2017-2019 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Ranganath Pathak <pathak@scrs1.org>
+ * @copyright Copyright (c) 2019 Jerry Padgett <sjpadgett@gmail.com>
+ * @copyright Copyright (c) 2019 Stephen Waite <stephen.waite@cmsvt.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
+
 require_once("../globals.php");
-require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/billing.inc");
 require_once("../../custom/code_types.inc.php");
 
+use OpenEMR\Billing\BillingUtilities;
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
+use OpenEMR\OeUI\OemrUI;
 use OpenEMR\Services\FacilityService;
 
 $facilityService = new FacilityService();
@@ -119,7 +117,7 @@ function receiptPaymentLine($paydate, $amount, $description = '')
 function generate_receipt($patient_id, $encounter = 0)
 {
  //REMEMBER the entire receipt is generated here, have to echo DOC type etc and closing tags to create a valid webpsge
-    global $sl_err, $sl_cash_acc, $css_header, $details, $facilityService;
+    global $sl_err, $sl_cash_acc, $details, $facilityService;
 
     // Get details for what we guess is the primary facility.
     $frow = $facilityService->getPrimaryBusinessEntity(array("useLegacyImplementation" => true));
@@ -163,20 +161,20 @@ function generate_receipt($patient_id, $encounter = 0)
     $encrow = sqlQuery("SELECT invoice_refno FROM form_encounter WHERE " .
     "pid = ? AND encounter = ? LIMIT 1", array($patient_id,$encounter));
     $invoice_refno = $encrow['invoice_refno'];
-    
+
     // being deliberately echoed to indicate it is part of the php function generate_receipt
     echo "<!DOCTYPE html>". PHP_EOL;
     echo "<html>".PHP_EOL;
     echo"<head>".PHP_EOL;
-?>
-        
+    ?>
+
         <?php Header::setupHeader(['datetime-picker']);?>
         <title><?php echo xlt('Receipt for Payment'); ?></title>
         <script language="JavaScript">
 
         <?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
 
-        $(document).ready(function() {
+        $(function() {
          var win = top.printLogSetup ? top : opener.top;
          win.printLogSetup(document.getElementById('printbutton'));
         });
@@ -189,7 +187,7 @@ function generate_receipt($patient_id, $encounter = 0)
 
         // Process click on Delete button.
         function deleteme() {
-         dlgopen('deleter.php?billing=<?php echo attr("$patient_id.$encounter"); ?>', '_blank', 500, 450);
+         dlgopen('deleter.php?billing=' + <?php echo js_url($patient_id.".".$encounter); ?> + '&csrf_token_form=' + <?php echo js_url(CsrfUtils::collectCsrfToken()); ?>, '_blank', 500, 450);
          return false;
         }
 
@@ -208,7 +206,7 @@ function generate_receipt($patient_id, $encounter = 0)
         }
         .table {
             margin: auto;
-            width: 90% !important; 
+            width: 90% !important;
         }
         @media (min-width: 992px){
             .modal-lg {
@@ -217,6 +215,7 @@ function generate_receipt($patient_id, $encounter = 0)
         }
         </style>
         <title><?php echo xlt('Patient Checkout'); ?></title>
+
     </head>
     <body class="body_top">
         <div class="container">
@@ -233,16 +232,16 @@ function generate_receipt($patient_id, $encounter = 0)
                         echo " " . xlt("Invoice Number") . ": " . text($invoice_refno) . " " . xlt("Service Date")  . ": " . text($svcdate);
                     }
                     ?>
-            </div>    
+            </div>
             <div class= "row">
-                <div class= 'col-xs-6 col-lg-offset-2'>
-                    <?php echo text($patdata['fname']) . ' ' . text($patdata['mname']) . ' ' . text($patdata['lname']) ?><br>
-                    <?php echo text($patdata['street']) ?><br>
-                    <?php echo text($patdata['city']) . ', ' . text($patdata['state']) . ' ' . text($patdata['postal_code']) ?><br>
+                <div class= 'col-6 offset-lg-2'>
+                    <?php echo text($patdata['fname']) . ' ' . text($patdata['mname']) . ' ' . text($patdata['lname']) ?><br />
+                    <?php echo text($patdata['street']) ?><br />
+                    <?php echo text($patdata['city']) . ', ' . text($patdata['state']) . ' ' . text($patdata['postal_code']) ?><br />
                 </div>
             </div>
             <div class= "row ">
-                <div class= 'col-xs-6 col-lg-offset-3'>
+                <div class= 'col-6 offset-lg-3'>
                     <table class="table">
                         <thead>
                             <tr>
@@ -361,19 +360,19 @@ function generate_receipt($patient_id, $encounter = 0)
                     </table>
                 </div>
             </div>
-            <br>
-            <div class= "row ">        
+            <br />
+            <div class= "row ">
                 <div class="form-group clearfix">
                     <div class="col-sm-12 text-center" id="hideonprint">
                         <div class="btn-group" role="group">
-                            <button class="btn btn-default btn-print"  id='printbutton'><?php echo xlt('Print'); ?></button>
-                            <?php if (acl_check('acct', 'disc')) { ?> 
-                                <button class="btn btn-default btn-undo" onclick='return deleteme();'><?php echo xlt('Undo Checkout'); ?></button> 
+                            <button class="btn btn-secondary btn-print"  id='printbutton'><?php echo xlt('Print'); ?></button>
+                            <?php if (AclMain::aclCheckCore('acct', 'disc')) { ?>
+                                <button class="btn btn-secondary btn-undo" onclick='return deleteme();'><?php echo xlt('Undo Checkout'); ?></button>
                             <?php } ?>
-                            <?php if ($details) { ?> 
-                                <button class="btn btn-default btn-hide" onclick="top.restoreSession(); window.location.href = 'pos_checkout.php?details=0&ptid=<?php echo attr($patient_id); ?>&enc=<?php echo attr($encounter); ?>'"><?php echo xlt('Hide Details'); ?></button> 
-                            <?php } else { ?> 
-                                <button class="btn btn-default btn-show" onclick="top.restoreSession(); window.location.href = 'pos_checkout.php?details=1&ptid=<?php echo attr($patient_id); ?>&enc=<?php echo attr($encounter); ?>'"><?php echo xlt('Show Details'); ?></button> 
+                            <?php if ($details) { ?>
+                                <button class="btn btn-secondary btn-hide" onclick="top.restoreSession(); window.location.href = 'pos_checkout.php?details=0&ptid=<?php echo attr_url($patient_id); ?>&enc=<?php echo attr_url($encounter); ?>'"><?php echo xlt('Hide Details'); ?></button>
+                            <?php } else { ?>
+                                <button class="btn btn-secondary btn-show" onclick="top.restoreSession(); window.location.href = 'pos_checkout.php?details=1&ptid=<?php echo attr_url($patient_id); ?>&enc=<?php echo attr_url($encounter); ?>'"><?php echo xlt('Show Details'); ?></button>
                             <?php } ?>
                         </div>
                     </div>
@@ -384,10 +383,10 @@ function generate_receipt($patient_id, $encounter = 0)
         echo"</body>".PHP_EOL;
         echo "</html>".PHP_EOL;
 } // end function generate_receipt()
-    ?>
+?>
     <?php
-    
-    
+
+
     // Function to output a line item for the input form.
     //
     $lino = 0;
@@ -425,7 +424,7 @@ function generate_receipt($patient_id, $encounter = 0)
         echo "  <td align='right'><input type='text' name='line[$lino][amount]' " .
            "value='" . attr($amount) . "' size='6' maxlength='8'";
         // Modifying prices requires the acct/disc permission.
-        // if ($code_type == 'TAX' || ($code_type != 'COPAY' && !acl_check('acct','disc')))
+        // if ($code_type == 'TAX' || ($code_type != 'COPAY' && !AclMain::aclCheckCore('acct','disc')))
         echo " style='text-align:right;background-color:transparent' readonly";
         // else echo " style='text-align:right' onkeyup='computeTotals()'";
         echo "></td>\n";
@@ -446,22 +445,22 @@ function generate_receipt($patient_id, $encounter = 0)
     function printFacilityHeader($frow)
     {
         echo "<p><b>" . text($frow['name']) .
-        "<br>" . text($frow['street']) .
-        "<br>" . text($frow['city']) . ', ' . text($frow['state']) . ' ' . text($frow['postal_code']) .
-        "<br>" . text($frow['phone']) .
-        "<br>&nbsp" .
-        "<br>";
+        "<br />" . text($frow['street']) .
+        "<br />" . text($frow['city']) . ', ' . text($frow['state']) . ' ' . text($frow['postal_code']) .
+        "<br />" . text($frow['phone']) .
+        "<br />&nbsp" .
+        "<br />";
     }
 
     // Pring receipt header for Provider
     function printProviderHeader($pvdrow)
     {
         echo "<p><b>" . text($pvdrow['title']) . " " . text($pvdrow['fname']) . " " . text($pvdrow['mname']) . " " . text($pvdrow['lname']) . " " .
-        "<br>" . text($pvdrow['street']) .
-        "<br>" . text($pvdrow['city']) . ', ' . text($pvdrow['state']) . ' ' . text($pvdrow['postal_code']) .
-        "<br>" . text($pvdrow['phone']) .
-        "<br>&nbsp" .
-        "<br>";
+        "<br />" . text($pvdrow['street']) .
+        "<br />" . text($pvdrow['city']) . ', ' . text($pvdrow['state']) . ' ' . text($pvdrow['postal_code']) .
+        "<br />" . text($pvdrow['phone']) .
+        "<br />&nbsp" .
+        "<br />";
     }
 
     // Mark the tax rates that are referenced in this invoice.
@@ -493,6 +492,10 @@ function generate_receipt($patient_id, $encounter = 0)
     // If the Save button was clicked...
     //
     if ($_POST['form_save']) {
+        if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+            CsrfUtils::csrfNotVerified();
+        }
+
       // On a save, do the following:
       // Flag drug_sales and billing items as billed.
       // Post the corresponding invoice with its payment(s) to sql-ledger
@@ -554,7 +557,7 @@ function generate_receipt($patient_id, $encounter = 0)
                 // table with a code type of TAX seems easiest.
                 // They will have to be stripped back out when building this
                 // script's input form.
-                addBilling(
+                BillingUtilities::addBilling(
                     $form_encounter,
                     'TAX',
                     'TAX',
@@ -634,7 +637,7 @@ function generate_receipt($patient_id, $encounter = 0)
                   "INSERT INTO ar_session (payer_id,user_id,reference,check_date,deposit_date,pay_total,".
                   " global_amount,payment_type,description,patient_id,payment_method,adjustment_code,post_to_date) ".
                   " VALUES ('0',?,?,now(),?,?,'','patient','COPAY',?,?,'patient_payment',now())",
-                  array($_SESSION['authId'],$form_source,$dosdate,$amount,$form_pid,$paydesc)
+                  array($_SESSION['authUserID'],$form_source,$dosdate,$amount,$form_pid,$paydesc)
               );
 
               sqlBeginTrans();
@@ -642,7 +645,7 @@ function generate_receipt($patient_id, $encounter = 0)
               $insrt_id=sqlInsert(
                   "INSERT INTO ar_activity (pid,encounter,sequence_no,code_type,code,modifier,payer_type,post_time,post_user,session_id,pay_amount,account_code)".
                   " VALUES (?,?,?,?,?,?,0,?,?,?,?,'PCP')",
-                  array($form_pid,$form_encounter,$sequence_no['increment'],$Codetype,$Code,$Modifier,$dosdate,$_SESSION['authId'],$session_id,$amount)
+                  array($form_pid,$form_encounter,$sequence_no['increment'],$Codetype,$Code,$Modifier,$dosdate,$_SESSION['authUserID'],$session_id,$amount)
               );
               sqlCommitTrans();
         }
@@ -652,7 +655,7 @@ function generate_receipt($patient_id, $encounter = 0)
         if (isset($_POST['form_irnumber'])) {
             $invoice_refno = trim($_POST['form_irnumber']);
         } else {
-            $invoice_refno = updateInvoiceRefNumber();
+            $invoice_refno = BillingUtilities::updateInvoiceRefNumber();
         }
         if ($invoice_refno) {
             sqlStatement("UPDATE form_encounter " .
@@ -715,7 +718,7 @@ function generate_receipt($patient_id, $encounter = 0)
     <head>
             <?php Header::setupHeader(['datetime-picker']);?>
             <script language="JavaScript">
-            var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
+            var mypcc = <?php echo js_escape($GLOBALS['phone_country_code']); ?>;
 
             <?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
 
@@ -743,10 +746,10 @@ function generate_receipt($patient_id, $encounter = 0)
               if (f[pfx + '[code_type]'].value != 'TAX') continue;
               if (f[pfx + '[code]'].value != rateid) continue;
               var tax = amount * parseFloat(f[pfx + '[taxrates]'].value);
-              tax = parseFloat(tax.toFixed(<?php echo $currdecimals ?>));
+              tax = parseFloat(tax.toFixed(<?php echo js_escape($currdecimals); ?>));
               var cumtax = parseFloat(f[pfx + '[price]'].value) + tax;
-              f[pfx + '[price]'].value  = cumtax.toFixed(<?php echo $currdecimals ?>); // requires JS 1.5
-              if (visible) f[pfx + '[amount]'].value = cumtax.toFixed(<?php echo $currdecimals ?>); // requires JS 1.5
+              f[pfx + '[price]'].value  = cumtax.toFixed(<?php echo js_escape($currdecimals); ?>); // requires JS 1.5
+              if (visible) f[pfx + '[amount]'].value = cumtax.toFixed(<?php echo js_escape($currdecimals); ?>); // requires JS 1.5
               if (isNaN(tax)) alert('Tax rate not numeric at line ' + lino);
               return tax;
              }
@@ -766,13 +769,13 @@ function generate_receipt($patient_id, $encounter = 0)
               if (isNaN(price)) alert('Price not numeric at line ' + lino);
               if (code_type == 'COPAY' || code_type == 'TAX') {
                // This works because the tax lines come last.
-               total += parseFloat(price.toFixed(<?php echo $currdecimals ?>));
+               total += parseFloat(price.toFixed(<?php echo js_escape($currdecimals); ?>));
                continue;
               }
               var units = f['line[' + lino + '][units]'].value;
               var amount = price * units;
-              amount = parseFloat(amount.toFixed(<?php echo $currdecimals ?>));
-              if (visible) f['line[' + lino + '][amount]'].value = amount.toFixed(<?php echo $currdecimals ?>);
+              amount = parseFloat(amount.toFixed(<?php echo js_escape($currdecimals); ?>));
+              if (visible) f['line[' + lino + '][amount]'].value = amount.toFixed(<?php echo js_escape($currdecimals); ?>);
               total += amount;
               var taxrates  = f['line[' + lino + '][taxrates]'].value;
               var taxids = taxrates.split(':');
@@ -795,11 +798,11 @@ function generate_receipt($patient_id, $encounter = 0)
              discount = 0.01 * discount * computeDiscountedTotals(0, false);
             <?php } ?>
              var total = computeDiscountedTotals(discount, true);
-             f.form_amount.value = total.toFixed(<?php echo $currdecimals ?>);
+             f.form_amount.value = total.toFixed(<?php echo js_escape($currdecimals); ?>);
              return true;
             }
 
-            $(document).ready(function() {
+            $(function() {
              $('.datepicker').datetimepicker({
                 <?php $datetimepicker_timepicker = false; ?>
                 <?php $datetimepicker_showseconds = false; ?>
@@ -819,7 +822,7 @@ function generate_receipt($patient_id, $encounter = 0)
                 }
                 .table {
                     margin: auto;
-                    width: 90% !important; 
+                    width: 90% !important;
                 }
                 @media (min-width: 992px){
                     .modal-lg {
@@ -828,274 +831,293 @@ function generate_receipt($patient_id, $encounter = 0)
                 }
             </style>
             <title><?php echo xlt('Patient Checkout'); ?></title>
+    <?php
+    $arrOeUiSettings = array(
+        'heading_title' => xl('Patient Checkout'),
+        'include_patient_name' => true,// use only in appropriate pages
+        'expandable' => false,
+        'expandable_files' => array(),//all file names need suffix _xpd
+        'action' => "",//conceal, reveal, search, reset, link or back
+        'action_title' => "",
+        'action_href' => "",//only for actions - reset, link or back
+        'show_help_icon' => false,
+        'help_file_name' => ""
+    );
+    $oemr_ui = new OemrUI($arrOeUiSettings);
+    ?>
     </head>
     <body>
-        <div class="container">
+        <div id="container_div" class="<?php echo $oemr_ui->oeContainer();?>">
             <div class="row">
-                <div class="page-header">
-                    <h2><?php echo xlt('Patient Checkout for '); ?><?php echo text($patdata['fname']) . " " .
-                            text($patdata['lname']) . " (" . text($patdata['pubpid']) . ")" ?></h2>
+                <div class="col-sm-12">
+                    <div class="page-header">
+                        <?php echo  $oemr_ui->pageHeading() . "\r\n"; ?>
+                    </div>
                 </div>
             </div>
             <div class="row">
-                <form action='pos_checkout.php' method='post'>
-                    <input name='form_pid' type='hidden' value='<?php echo attr($patient_id) ?>'>
-                    <fieldset>
-                        <legend><?php echo xlt('Item Details'); ?></legend>
-                        <div class= "table-responsive">
-                            <table class = "table">
-                                <tr>
-                                    <td><b><?php echo xlt('Date'); ?></b></td>
-                                    <td><b><?php echo xlt('Description'); ?></b></td>
-                                    <td align='right'><b><?php echo xlt('Qty'); ?></b></td>
-                                    <td align='right'><b><?php echo xlt('Amount'); ?></b></td>
-                                </tr><?php
-                                $inv_encounter = '';
-                                $inv_date      = '';
-                                $inv_provider  = 0;
-                                $inv_payer     = 0;
-                                $gcac_related_visit = false;
-                                $gcac_service_provided = false;
+                <div class="col-sm-12">
+                    <form action='pos_checkout.php' method='post'>
+                        <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
+                        <input name='form_pid' type='hidden' value='<?php echo attr($patient_id) ?>'>
+                        <fieldset>
+                            <legend><?php echo xlt('Item Details'); ?></legend>
+                            <div class= "table-responsive">
+                                <table class = "table">
+                                    <tr>
+                                        <td><b><?php echo xlt('Date'); ?></b></td>
+                                        <td><b><?php echo xlt('Description'); ?></b></td>
+                                        <td align='right'><b><?php echo xlt('Qty'); ?></b></td>
+                                        <td align='right'><b><?php echo xlt('Amount'); ?></b></td>
+                                    </tr><?php
+                                    $inv_encounter = '';
+                                    $inv_date      = '';
+                                    $inv_provider  = 0;
+                                    $inv_payer     = 0;
+                                    $gcac_related_visit = false;
+                                    $gcac_service_provided = false;
 
-                                // Process billing table items.
-                                // Items that are not allowed to have a fee are skipped.
-                                //
-                                while ($brow = sqlFetchArray($bres)) {
-                                    // Skip all but the most recent encounter.
-                                    if ($inv_encounter && $brow['encounter'] != $inv_encounter) {
-                                        continue;
-                                    }
-
-                                    $thisdate = substr($brow['date'], 0, 10);
-                                    $code_type = $brow['code_type'];
-
-                                    // Collect tax rates, related code and provider ID.
-                                    $taxrates = '';
-                                    $related_code = '';
-                                    $sqlBindArray = array();
-                                    if (!empty($code_types[$code_type]['fee'])) {
-                                        $query = "SELECT taxrates, related_code FROM codes WHERE code_type = ? " .
-                                        " AND " .
-                                        "code = ? AND ";
-                                        array_push($sqlBindArray, $code_types[$code_type]['id'], $brow['code']);
-                                        if ($brow['modifier']) {
-                                            $query .= "modifier = ?";
-                                            array_push($sqlBindArray, $brow['modifier']);
-                                        } else {
-                                            $query .= "(modifier IS NULL OR modifier = '')";
+                                    // Process billing table items.
+                                    // Items that are not allowed to have a fee are skipped.
+                                    //
+                                    while ($brow = sqlFetchArray($bres)) {
+                                        // Skip all but the most recent encounter.
+                                        if ($inv_encounter && $brow['encounter'] != $inv_encounter) {
+                                            continue;
                                         }
-                                        $query .= " LIMIT 1";
-                                        $tmp = sqlQuery($query, $sqlBindArray);
-                                        $taxrates = $tmp['taxrates'];
-                                        $related_code = $tmp['related_code'];
-                                        markTaxes($taxrates);
-                                    }
 
-                                    write_form_line(
-                                        $code_type,
-                                        $brow['code'],
-                                        $brow['id'],
-                                        $thisdate,
-                                        $brow['code_text'],
-                                        $brow['fee'],
-                                        $brow['units'],
-                                        $taxrates
-                                    );
-                                    if (!$inv_encounter) {
-                                        $inv_encounter = $brow['encounter'];
-                                    }
-                                    $inv_payer = $brow['payer_id'];
-                                    if (!$inv_date || $inv_date < $thisdate) {
-                                        $inv_date = $thisdate;
-                                    }
+                                        $thisdate = substr($brow['date'], 0, 10);
+                                        $code_type = $brow['code_type'];
 
-                                    // Custom logic for IPPF to determine if a GCAC issue applies.
-                                    if ($GLOBALS['ippf_specific'] && $related_code) {
-                                        $relcodes = explode(';', $related_code);
-                                        foreach ($relcodes as $codestring) {
-                                            if ($codestring === '') {
-                                                continue;
+                                        // Collect tax rates, related code and provider ID.
+                                        $taxrates = '';
+                                        $related_code = '';
+                                        $sqlBindArray = array();
+                                        if (!empty($code_types[$code_type]['fee'])) {
+                                            $query = "SELECT taxrates, related_code FROM codes WHERE code_type = ? " .
+                                            " AND " .
+                                            "code = ? AND ";
+                                            array_push($sqlBindArray, $code_types[$code_type]['id'], $brow['code']);
+                                            if ($brow['modifier']) {
+                                                $query .= "modifier = ?";
+                                                array_push($sqlBindArray, $brow['modifier']);
+                                            } else {
+                                                $query .= "(modifier IS NULL OR modifier = '')";
                                             }
-                                            list($codetype, $code) = explode(':', $codestring);
-                                            if ($codetype !== 'IPPF') {
-                                                continue;
-                                            }
-                                            if (preg_match('/^25222/', $code)) {
-                                                $gcac_related_visit = true;
-                                                if (preg_match('/^25222[34]/', $code)) {
-                                                    $gcac_service_provided = true;
+                                            $query .= " LIMIT 1";
+                                            $tmp = sqlQuery($query, $sqlBindArray);
+                                            $taxrates = $tmp['taxrates'];
+                                            $related_code = $tmp['related_code'];
+                                            markTaxes($taxrates);
+                                        }
+
+                                        write_form_line(
+                                            $code_type,
+                                            $brow['code'],
+                                            $brow['id'],
+                                            $thisdate,
+                                            $brow['code_text'],
+                                            $brow['fee'],
+                                            $brow['units'],
+                                            $taxrates
+                                        );
+                                        if (!$inv_encounter) {
+                                            $inv_encounter = $brow['encounter'];
+                                        }
+                                        $inv_payer = $brow['payer_id'];
+                                        if (!$inv_date || $inv_date < $thisdate) {
+                                            $inv_date = $thisdate;
+                                        }
+
+                                        // Custom logic for IPPF to determine if a GCAC issue applies.
+                                        if ($GLOBALS['ippf_specific'] && $related_code) {
+                                            $relcodes = explode(';', $related_code);
+                                            foreach ($relcodes as $codestring) {
+                                                if ($codestring === '') {
+                                                    continue;
+                                                }
+                                                list($codetype, $code) = explode(':', $codestring);
+                                                if ($codetype !== 'IPPF') {
+                                                    continue;
+                                                }
+                                                if (preg_match('/^25222/', $code)) {
+                                                    $gcac_related_visit = true;
+                                                    if (preg_match('/^25222[34]/', $code)) {
+                                                        $gcac_service_provided = true;
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                }
-                                
-                                // Process copays
-                                //
-                                $totalCopay = getPatientCopay($patient_id, $encounter);
-                                if ($totalCopay < 0) {
-                                    write_form_line("COPAY", "", "", "", "", $totalCopay, "", "");
-                                }
-                                
-                                // Process drug sales / products.
-                                //
-                                while ($drow = sqlFetchArray($dres)) {
-                                    if ($inv_encounter && $drow['encounter'] && $drow['encounter'] != $inv_encounter) {
-                                        continue;
-                                    }
-                                    
-                                    $thisdate = $drow['sale_date'];
-                                    if (!$inv_encounter) {
-                                        $inv_encounter = $drow['encounter'];
+
+                                    // Process copays
+                                    //
+                                    $totalCopay = BillingUtilities::getPatientCopay($patient_id, $encounter);
+                                    if ($totalCopay < 0) {
+                                        write_form_line("COPAY", "", "", "", "", $totalCopay, "", "");
                                     }
 
-                                    if (!$inv_provider && !empty($arr_users[$drow['provider_id']])) {
-                                        $inv_provider = $drow['provider_id'] + 0;
-                                    }
-
-                                    if (!$inv_date || $inv_date < $thisdate) {
-                                        $inv_date = $thisdate;
-                                    }
-
-                                    // Accumulate taxes for this product.
-                                    $tmp = sqlQuery("SELECT taxrates FROM drug_templates WHERE drug_id = ? " .
-                                      " ORDER BY selector LIMIT 1", array($drow['drug_id']));
-                                    // accumTaxes($drow['fee'], $tmp['taxrates']);
-                                    $taxrates = $tmp['taxrates'];
-                                    markTaxes($taxrates);
-
-                                    write_form_line(
-                                        'PROD',
-                                        $drow['drug_id'],
-                                        $drow['sale_id'],
-                                        $thisdate,
-                                        $drow['name'],
-                                        $drow['fee'],
-                                        $drow['quantity'],
-                                        $taxrates
-                                    );
-                                }
-
-                                // Write a form line for each tax that has money, adding to $total.
-                                foreach ($taxes as $key => $value) {
-                                    if ($value[2]) {
-                                        write_form_line('TAX', $key, $key, date('Y-m-d'), $value[0], 0, 1, $value[1]);
-                                    }
-                                }
-
-                                // Besides copays, do not collect any other information from ar_activity,
-                                // since this is for appt checkout.
-
-                                if ($inv_encounter) {
-                                    $erow = sqlQuery("SELECT provider_id FROM form_encounter WHERE " .
-                                    "pid = ? AND encounter = ? " .
-                                    "ORDER BY id DESC LIMIT 1", array($patient_id,$inv_encounter));
-                                    $inv_provider = $erow['provider_id'] + 0;
-                                }
-                                ?>
-                            </table>
-                        </div>
-                    </fieldset>
-                    <fieldset>
-                        <legend><?php echo xlt('Collect Payment'); ?></legend>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
-                                <label class="control-label" for="form_discount"><?php echo $GLOBALS['discount_by_money'] ? xlt('Discount Amount') : xlt('Discount Percentage'); ?>:</label>
-                            </div>
-                            <div class="col-xs-3">
-                                <input maxlength='8' name='form_discount' id='form_discount' onkeyup='computeTotals()' class= 'form-control' type='text' value=''>
-                            </div>
-                        </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
-                                <label class="control-label" for="form_method"><?php echo xlt('Payment Method'); ?>:</label>
-                            </div>
-                            <div class="col-xs-3">
-                                <select name='form_method' id='form_method' class='form-control'>
-                                    <?php
-                                        $query1112 = "SELECT * FROM list_options where list_id=?  ORDER BY seq, title ";
-                                        $bres1112 = sqlStatement($query1112, array('payment_method'));
-                                    while ($brow1112 = sqlFetchArray($bres1112)) {
-                                        if ($brow1112['option_id']=='electronic' || $brow1112['option_id']=='bank_draft') {
+                                    // Process drug sales / products.
+                                    //
+                                    while ($drow = sqlFetchArray($dres)) {
+                                        if ($inv_encounter && $drow['encounter'] && $drow['encounter'] != $inv_encounter) {
                                             continue;
                                         }
-                                        echo "<option value='".attr($brow1112['option_id'])."'>".text(xl_list_label($brow1112['title']))."</option>";
+
+                                        $thisdate = $drow['sale_date'];
+                                        if (!$inv_encounter) {
+                                            $inv_encounter = $drow['encounter'];
+                                        }
+
+                                        if (!$inv_provider && !empty($arr_users[$drow['provider_id']])) {
+                                            $inv_provider = $drow['provider_id'] + 0;
+                                        }
+
+                                        if (!$inv_date || $inv_date < $thisdate) {
+                                            $inv_date = $thisdate;
+                                        }
+
+                                        // Accumulate taxes for this product.
+                                        $tmp = sqlQuery("SELECT taxrates FROM drug_templates WHERE drug_id = ? " .
+                                          " ORDER BY selector LIMIT 1", array($drow['drug_id']));
+                                        // accumTaxes($drow['fee'], $tmp['taxrates']);
+                                        $taxrates = $tmp['taxrates'];
+                                        markTaxes($taxrates);
+
+                                        write_form_line(
+                                            'PROD',
+                                            $drow['drug_id'],
+                                            $drow['sale_id'],
+                                            $thisdate,
+                                            $drow['name'],
+                                            $drow['fee'],
+                                            $drow['quantity'],
+                                            $taxrates
+                                        );
                                     }
+
+                                    // Write a form line for each tax that has money, adding to $total.
+                                    foreach ($taxes as $key => $value) {
+                                        if ($value[2]) {
+                                            write_form_line('TAX', $key, $key, date('Y-m-d'), $value[0], 0, 1, $value[1]);
+                                        }
+                                    }
+
+                                    // Besides copays, do not collect any other information from ar_activity,
+                                    // since this is for appt checkout.
+
+                                    if ($inv_encounter) {
+                                        $erow = sqlQuery("SELECT provider_id FROM form_encounter WHERE " .
+                                        "pid = ? AND encounter = ? " .
+                                        "ORDER BY id DESC LIMIT 1", array($patient_id,$inv_encounter));
+                                        $inv_provider = $erow['provider_id'] + 0;
+                                    }
+                                    ?>
+                                </table>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend><?php echo xlt('Collect Payment'); ?></legend>
+                            <div class="col-12 oe-custom-line">
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_discount"><?php echo $GLOBALS['discount_by_money'] ? xlt('Discount Amount') : xlt('Discount Percentage'); ?>:</label>
+                                </div>
+                                <div class="col-3">
+                                    <input maxlength='8' name='form_discount' id='form_discount' onkeyup='computeTotals()' class= 'form-control' type='text' value=''>
+                                </div>
+                            </div>
+                            <div class="col-12 oe-custom-line">
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_method"><?php echo xlt('Payment Method'); ?>:</label>
+                                </div>
+                                <div class="col-3">
+                                    <select name='form_method' id='form_method' class='form-control'>
+                                        <?php
+                                            $query1112 = "SELECT * FROM list_options where list_id=?  ORDER BY seq, title ";
+                                            $bres1112 = sqlStatement($query1112, array('payment_method'));
+                                        while ($brow1112 = sqlFetchArray($bres1112)) {
+                                            if ($brow1112['option_id']=='electronic' || $brow1112['option_id']=='bank_draft') {
+                                                continue;
+                                            }
+                                            echo "<option value='".attr($brow1112['option_id'])."'>".text(xl_list_label($brow1112['title']))."</option>";
+                                        }
                                         ?>
-                                </select>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-12 oe-custom-line">
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_source"><?php echo xlt('Check/Reference Number'); ?>:</label>
+                                </div>
+                                <div class="col-3">
+                                    <input name='form_source' id='form_source' class= 'form-control' type='text' value=''>
+                                </div>
+                            </div>
+                            <div class="col-12 oe-custom-line">
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_amount"><?php echo xlt('Amount Paid'); ?>:</label>
+                                </div>
+                                <div class="col-3">
+                                    <input name='form_amount' id='form_amount'class='form-control' type='text' value='0.00'>
+                                </div>
+                            </div>
+                            <div class="col-12 oe-custom-line">
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_date"><?php echo xlt('Posting Date'); ?>:</label>
+                                </div>
+                                <div class="col-3">
+                                    <input class='form-control datepicker' id='form_date' name='form_date' title='yyyy-mm-dd date of service' type='text' value='<?php echo attr($inv_date) ?>'>
+                                </div>
+                            </div>
+                            <?php
+                            // If this user has a non-empty irnpool assigned, show the pending
+                            // invoice reference number.
+                            $irnumber = BillingUtilities::getInvoiceRefNumber();
+                            if (!empty($irnumber)) {
+                                ?>
+                            <div class="col-12 oe-custom-line">
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_tentative"><?php echo xlt('Tentative Invoice Ref No'); ?>:</label>
+                                </div>
+                                <div class="col-3">
+                                    <div name='form_source' id='form_tentative' id='form_tentative' class= 'form-control'><?php echo text($irnumber); ?></div>
+                                </div>
+                            </div>
+                                <?php
+                            } elseif (!empty($GLOBALS['gbl_mask_invoice_number'])) { // Otherwise if there is an invoice
+                                // reference number mask, ask for the refno.
+                                ?>
+                            <div class="col-12 oe-custom-line">
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_irnumber"><?php echo xlt('Invoice Reference Number'); ?>:</label>
+                                </div>
+                                <div class="col-3">
+                                    <input type='text' name='form_irnumber' id='form_irnumber' class='form-control' value='' onkeyup='maskkeyup(this,<?php echo attr_js($GLOBALS['gbl_mask_invoice_number']); ?>)' onblur='maskblur(this,<?php echo attr_js($GLOBALS['gbl_mask_invoice_number']); ?>)' />
+                                </div>
+                            </div>
+                                <?php
+                            }
+                            ?>
+                        </fieldset>
+                        <div class="form-group">
+                            <div class="col-sm-12 text-left position-override">
+                                <div class="btn-group btn-group-pinch" role="group">
+                                    <button type='submit' class="btn btn-secondary btn-save"  name='form_save' id='form_save' value='save'><?php echo xlt('Save');?></button>
+                                    <?php if (empty($_GET['framed'])) { ?>
+                                    <button type='button' class="btn btn-link btn-cancel btn-separate-left" onclick='window.close()'><?php echo xlt('Cancel'); ?></button>
+                                    <?php } ?>
+                                    <input type='hidden' name='form_provider'  value='<?php echo attr($inv_provider)  ?>' />
+                                    <input type='hidden' name='form_payer'     value='<?php echo attr($inv_payer)     ?>' />
+                                    <input type='hidden' name='form_encounter' value='<?php echo attr($inv_encounter) ?>' />
+                                </div>
                             </div>
                         </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
-                                <label class="control-label" for="form_source"><?php echo xlt('Check/Reference Number'); ?>:</label>
-                            </div>
-                            <div class="col-xs-3">
-                                <input name='form_source' id='form_source' class= 'form-control' type='text' value=''>
-                            </div>
-                        </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
-                                <label class="control-label" for="form_amount"><?php echo xlt('Amount Paid'); ?>:</label>
-                            </div>
-                            <div class="col-xs-3">
-                                <input name='form_amount' id='form_amount'class='form-control' type='text' value='0.00'>
-                            </div>
-                        </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
-                                <label class="control-label" for="form_date"><?php echo xlt('Posting Date'); ?>:</label>
-                            </div>
-                            <div class="col-xs-3">
-                                <input class='form-control datepicker' id='form_date' name='form_date' title='yyyy-mm-dd date of service' type='text' value='<?php echo attr($inv_date) ?>'>
-                            </div>
-                        </div>
-                        <?php
-                        // If this user has a non-empty irnpool assigned, show the pending
-                        // invoice reference number.
-                        $irnumber = getInvoiceRefNumber();
-                        if (!empty($irnumber)) {
-                        ?>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
-                                <label class="control-label" for="form_tentative"><?php echo xlt('Tentative Invoice Ref No'); ?>:</label>
-                            </div>
-                            <div class="col-xs-3">
-                                <div name='form_source' id='form_tentative' id='form_tentative' class= 'form-control'><?php echo text($irnumber); ?></div>
-                            </div>
-                        </div>
-                        <?php
-                        } // Otherwise if there is an invoice reference number mask, ask for the refno.
-                        elseif (!empty($GLOBALS['gbl_mask_invoice_number'])) {
-                        ?>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
-                                <label class="control-label" for="form_irnumber"><?php echo xlt('Invoice Reference Number'); ?>:</label>
-                            </div>
-                            <div class="col-xs-3">
-                                <input type='text' name='form_irnumber' id='form_irnumber' class='form-control' value='' onkeyup='maskkeyup(this,"<?php echo addslashes($GLOBALS['gbl_mask_invoice_number']); ?>")' onblur='maskblur(this,"<?php echo addslashes($GLOBALS['gbl_mask_invoice_number']); ?>")' />
-                            </div>
-                        </div>
-                        <?php
-                        }
-                        ?>
-                    </fieldset>
-                    <div class="form-group">
-                        <div class="col-sm-12 text-left position-override">
-                            <div class="btn-group btn-group-pinch" role="group">
-                                <!--<input type='submit' class="btn btn-default btn-save"  name='form_save' id='form_save' value='<?php echo xla('Save'); ?>' />-->
-                                <button type='submit' class="btn btn-default btn-save"  name='form_save' id='form_save' ><?php echo xla('Save'); ?></button>
-                                <?php if (empty($_GET['framed'])) { ?>
-                                <button type='button' class="btn btn-link btn-cancel btn-separate-left" onclick='window.close()'><?php echo xlt('Cancel'); ?></button>
-                                <?php } ?>
-                                <input type='hidden' name='form_provider'  value='<?php echo attr($inv_provider)  ?>' />
-                                <input type='hidden' name='form_payer'     value='<?php echo attr($inv_payer)     ?>' />
-                                <input type='hidden' name='form_encounter' value='<?php echo attr($inv_encounter) ?>' />
-                            </div>
-                        </div>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
-            <script language='JavaScript'>
+        </div><!-- end of div container-->
+        <?php $oemr_ui->oeBelowContainerDiv();?>
+        <script language='JavaScript'>
             computeTotals();
                 <?php
                 if ($gcac_related_visit && !$gcac_service_provided) {
@@ -1112,13 +1134,12 @@ function generate_receipt($patient_id, $encounter = 0)
                             "WHERE pid = ? AND encounter = ? AND " .
                              "deleted = 0 AND formdir = 'LBFgcac'", array($patient_id,$inv_encounter));
                             if (empty($grow['count'])) { // if there is no gcac form
-                                echo " alert('" . addslashes(xl('This visit will need a GCAC form, referral or procedure service.')) . "');\n";
+                                echo " alert(" . xlj('This visit will need a GCAC form, referral or procedure service.') . ");\n";
                             }
                         }
                     }
                 } // end if ($gcac_related_visit)
                 ?>
             </script>
-        </div><!-- end of div container-->
     </body>
 </html>

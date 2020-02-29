@@ -5,10 +5,11 @@
  * @package   OpenEMR
  * @link      http://www.open-emr.org
  * @author    Brady Miller <brady.g.miller@gmail.com>
- * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @author    Sherwin Gaddis <sherwingaddis@gmail.com>
+ * @copyright Copyright (c) 2018-2019 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2019 Sherwin Gaddis <sherwingaddis@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
-
 
 use OpenEMR\Services\FacilityService;
 
@@ -51,24 +52,12 @@ $policy_types = array(
  *               If no subsection was given, returns everything, with the
  *               date of birth as the last field.
  */
+// To prevent sql injection on this function, if a variable is used for $given parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getPatientData($pid, $given = "*, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS")
 {
     $sql = "select $given from patient_data where pid=? order by date DESC limit 0,1";
     return sqlQuery($sql, array($pid));
-}
-
-function getLanguages()
-{
-    $returnval = array('','english');
-    $sql = "select distinct lower(language) as language from patient_data";
-    $rez = sqlStatement($sql);
-    for ($iter=0; $row=sqlFetchArray($rez); $iter++) {
-        if (($row["language"] != "english") && ($row["language"] != "")) {
-            array_push($returnval, $row["language"]);
-        }
-    }
-
-    return $returnval;
 }
 
 function getInsuranceProvider($ins_id)
@@ -89,11 +78,9 @@ function getInsuranceProviders()
         for ($iter=0; $row=sqlFetchArray($rez); $iter++) {
             $returnval[$row['id']] = $row['name'];
         }
-    } // Please leave this here. I have a user who wants to see zip codes and PO
-    // box numbers listed along with the insurance company names, as many companies
-    // have different billing addresses for different plans.  -- Rod Roark
-    //
-    else {
+    } else { // Please leave this here. I have a user who wants to see zip codes and PO
+        // box numbers listed along with the insurance company names, as many companies
+        // have different billing addresses for different plans.  -- Rod Roark
         $sql = "select insurance_companies.name, insurance_companies.id, " .
           "addresses.zip, addresses.line1 " .
           "from insurance_companies, addresses " .
@@ -159,25 +146,6 @@ function getInsuranceProvidersExtra()
     return $returnval;
 }
 
-function getProviders()
-{
-    $returnval = array();
-    $sql = "select fname, lname, suffix from users where authorized = 1 and " .
-        "active = 1 and username != ''";
-    $rez = sqlStatement($sql);
-    for ($iter=0; $row=sqlFetchArray($rez); $iter++) {
-        if (($row["fname"] != "") && ($row["lname"] != "")) {
-            if ($row["suffix"] != "") {
-                $row["lname"] .= ", ".$row["suffix"];
-            }
-
-            array_push($returnval, $row["fname"] . " " . $row["lname"]);
-        }
-    }
-
-    return $returnval;
-}
-
 // ----------------------------------------------------------------------------
 // Get one facility row.  If the ID is not specified, then get either the
 // "main" (billing) facility, or the default facility of the currently
@@ -191,11 +159,18 @@ function getFacility($facid = 0)
     $facility = null;
 
     if ($facid > 0) {
-        $facility = $facilityService->getById($facid);
-    } elseif ($facid == 0) {
-        $facility = $facilityService->getPrimaryBillingLocation();
+        return $facilityService->getById($facid);
+    }
+
+    if ($GLOBALS['login_into_facility']) {
+        //facility is saved in sessions
+        $facility  = $facilityService->getById($_SESSION['facilityId']);
     } else {
-        $facility = $facilityService->getFacilityForUser($_SESSION['authUserID']);
+        if ($facid == 0) {
+            $facility = $facilityService->getPrimaryBillingLocation();
+        } else {
+            $facility = $facilityService->getFacilityForUser($_SESSION['authUserID']);
+        }
     }
 
     return $facility;
@@ -204,29 +179,29 @@ function getFacility($facid = 0)
 // Generate a report title including report name and facility name, address
 // and phone.
 //
-function genFacilityTitle($repname = '', $facid = 0)
+function genFacilityTitle($repname = '', $facid = 0, $logo = '')
 {
     $s = '';
     $s .= "<table class='ftitletable'>\n";
     $s .= " <tr>\n";
     if (empty($logo)) {
-        $s .= "  <td class='ftitlecell1'>$repname</td>\n";
+        $s .= "  <td class='ftitlecell1'>" . text($repname) . "</td>\n";
     } else {
-        $s .= "  <td class='ftitlecell1'>$logo</td>\n";
-        $s .= "  <td class='ftitlecellm'>$repname</td>\n";
+        $s .= "  <td class='ftitlecell1'>" . $logo . "</td>\n";
+        $s .= "  <td class='ftitlecellm'>" . text($repname) . "</td>\n";
     }
     $s .= "  <td class='ftitlecell2'>\n";
     $r = getFacility($facid);
     if (!empty($r)) {
-        $s .= "<b>" . htmlspecialchars($r['name'], ENT_NOQUOTES) . "</b>\n";
+        $s .= "<b>" . text($r['name']) . "</b>\n";
         if ($r['street']) {
-            $s .= "<br />" . htmlspecialchars($r['street'], ENT_NOQUOTES) . "\n";
+            $s .= "<br />" . text($r['street']) . "\n";
         }
 
         if ($r['city'] || $r['state'] || $r['postal_code']) {
             $s .= "<br />";
             if ($r['city']) {
-                $s .= htmlspecialchars($r['city'], ENT_NOQUOTES);
+                $s .= text($r['city']);
             }
 
             if ($r['state']) {
@@ -234,22 +209,22 @@ function genFacilityTitle($repname = '', $facid = 0)
                     $s .= ", \n";
                 }
 
-                $s .= htmlspecialchars($r['state'], ENT_NOQUOTES);
+                $s .= text($r['state']);
             }
 
             if ($r['postal_code']) {
-                $s .= " " . htmlspecialchars($r['postal_code'], ENT_NOQUOTES);
+                $s .= " " . text($r['postal_code']);
             }
 
             $s .= "\n";
         }
 
         if ($r['country_code']) {
-            $s .= "<br />" . htmlspecialchars($r['country_code'], ENT_NOQUOTES) . "\n";
+            $s .= "<br />" . text($r['country_code']) . "\n";
         }
 
         if (preg_match('/[1-9]/', $r['phone'])) {
-            $s .= "<br />" . htmlspecialchars($r['phone'], ENT_NOQUOTES) . "\n";
+            $s .= "<br />" . text($r['phone']) . "\n";
         }
     }
 
@@ -273,28 +248,6 @@ function getFacilities($first = '')
     global $facilityService;
 
     $fres = $facilityService->getAll();
-
-    if ($first == 'first') {
-        return $fres[0]['id'];
-    } else {
-        return $fres;
-    }
-}
-
-/**
-GET SERVICE FACILITIES
-
-returns all service_location facilities or just the id for the first one
-(FACILITY FILTERING (CHEMED))
-
-@param string - if 'first' return first facility ordered by id
-@return array | int for 'first' case
-*/
-function getServiceFacilities($first = '')
-{
-    global $facilityService;
-
-    $fres = $facilityService->getAllServiceLocations();
 
     if ($first == 'first') {
         return $fres[0]['id'];
@@ -354,34 +307,9 @@ function getProviderInfo($providerID = "%", $providers_only = true, $facility = 
     return $returnval;
 }
 
-//same as above but does not reduce if only 1 row returned
-function getCalendarProviderInfo($providerID = "%", $providers_only = true)
+function getProviderName($providerID, $provider_only = 'any')
 {
-    $param1 = "";
-    if ($providers_only) {
-        $param1 = "AND authorized=1";
-    }
-
-    $command = "=";
-    if ($providerID == "%") {
-        $command = "like";
-    }
-
-    $query = "select distinct id, username, lname, fname, authorized, info, facility " .
-        "from users where active = 1 and username != '' and id $command '" .
-        add_escape_custom($providerID) . "' " . $param1;
-
-    $rez = sqlStatement($query);
-    for ($iter=0; $row=sqlFetchArray($rez); $iter++) {
-        $returnval[$iter]=$row;
-    }
-
-    return $returnval;
-}
-
-function getProviderName($providerID)
-{
-    $pi = getProviderInfo($providerID, 'any');
+    $pi = getProviderInfo($providerID, $provider_only);
     if (strlen($pi[0]["lname"]) > 0) {
         if (strlen($pi[0]["suffix"]) > 0) {
             $pi[0]["lname"] .= ", ".$pi[0]["suffix"];
@@ -404,41 +332,32 @@ function getProviderId($providerName)
     return $returnval;
 }
 
-function getEthnoRacials()
-{
-    $returnval = array("");
-    $sql = "select distinct lower(ethnoracial) as ethnoracial from patient_data";
-    $rez = sqlStatement($sql);
-    for ($iter=0; $row=sqlFetchArray($rez); $iter++) {
-        if (($row["ethnoracial"] != "")) {
-            array_push($returnval, $row["ethnoracial"]);
-        }
-    }
-
-    return $returnval;
-}
-
+// To prevent sql injection on this function, if a variable is used for $given parameter, then
+// it needs to be escaped via whitelisting prior to using this function; see lines 2020-2121 of
+// library/clinical_rules.php script for example of this.
 function getHistoryData($pid, $given = "*", $dateStart = '', $dateEnd = '')
 {
-
-    if ($dateStart && $dateEnd) {
-        $res = sqlQuery("select $given from history_data where pid = ? and date >= ? and date <= ? order by date DESC limit 0,1", array($pid,$dateStart,$dateEnd));
-    } elseif ($dateStart && !$dateEnd) {
-        $res = sqlQuery("select $given from history_data where pid = ? and date >= ? order by date DESC limit 0,1", array($pid,$dateStart));
-    } elseif (!$dateStart && $dateEnd) {
-        $res = sqlQuery("select $given from history_data where pid = ? and date <= ? order by date DESC limit 0,1", array($pid,$dateEnd));
-    } else {
-        $res = sqlQuery("select $given from history_data where pid=? order by date DESC limit 0,1", array($pid));
+    $where = '';
+    if ($given == 'tobacco') {
+        $where = 'tobacco is not null and';
     }
 
-    if ($given == 'tobacco') {
-        $res = sqlQuery("select $given from history_data where pid = ? and tobacco is not null and date >= ? and date <= ? order by date DESC limit 0,1", array($pid,$dateStart,$dateEnd));
+    if ($dateStart && $dateEnd) {
+        $res = sqlQuery("select $given from history_data where $where pid = ? and date >= ? and date <= ? order by date DESC limit 0,1", array($pid,$dateStart,$dateEnd));
+    } elseif ($dateStart && !$dateEnd) {
+        $res = sqlQuery("select $given from history_data where $where pid = ? and date >= ? order by date DESC limit 0,1", array($pid,$dateStart));
+    } elseif (!$dateStart && $dateEnd) {
+        $res = sqlQuery("select $given from history_data where $where pid = ? and date <= ? order by date DESC limit 0,1", array($pid,$dateEnd));
+    } else {
+        $res = sqlQuery("select $given from history_data where $where pid=? order by date DESC limit 0,1", array($pid));
     }
 
     return $res;
 }
 
 // function getInsuranceData($pid, $type = "primary", $given = "insd.*, DATE_FORMAT(subscriber_DOB,'%m/%d/%Y') as subscriber_DOB, ic.name as provider_name")
+// To prevent sql injection on this function, if a variable is used for $given parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getInsuranceData($pid, $type = "primary", $given = "insd.*, ic.name as provider_name")
 {
     $sql = "select $given from insurance_data as insd " .
@@ -447,6 +366,8 @@ function getInsuranceData($pid, $type = "primary", $given = "insd.*, ic.name as 
     return sqlQuery($sql, array($pid, $type));
 }
 
+// To prevent sql injection on this function, if a variable is used for $given parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getInsuranceDataByDate(
     $pid,
     $date,
@@ -464,6 +385,8 @@ function getInsuranceDataByDate(
     return sqlQuery($sql, array($pid,$date,$type));
 }
 
+// To prevent sql injection on this function, if a variable is used for $given parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getEmployerData($pid, $given = "*")
 {
     $sql = "select $given from employer_data where pid=? order by date DESC limit 0,1";
@@ -500,6 +423,8 @@ function _set_patient_inc_count($limit, $count, $where, $whereBindArray = array(
  * @param string $start
  * @return array
  */
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getPatientLnames($term = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit = "all", $start = "0")
 {
     $names = getPatientNameSplit($term);
@@ -553,11 +478,11 @@ function getPatientLnames($term = "%", $given = "pid, id, lname, fname, mname, p
     }
 
     if (!empty($GLOBALS['pt_restrict_field'])) {
-        if ($_SESSION{"authUser"} != 'admin' || $GLOBALS['pt_restrict_admin']) {
+        if ($_SESSION["authUser"] != 'admin' || $GLOBALS['pt_restrict_admin']) {
             $where .= " AND ( patient_data." . add_escape_custom($GLOBALS['pt_restrict_field']) .
                 " = ( SELECT facility_id FROM users WHERE username = ?) OR patient_data." .
                 add_escape_custom($GLOBALS['pt_restrict_field']) . " = '' ) ";
-            array_push($sqlBindArray, $_SESSION{"authUser"});
+            array_push($sqlBindArray, $_SESSION["authUser"]);
         }
     }
 
@@ -624,6 +549,8 @@ function getPatientNameSplit($term)
     return $n; // associative array containing names
 }
 
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getPatientId($pid = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit = "all", $start = "0")
 {
 
@@ -631,11 +558,11 @@ function getPatientId($pid = "%", $given = "pid, id, lname, fname, mname, provid
     $where = "pubpid LIKE ? ";
     array_push($sqlBindArray, $pid."%");
     if (!empty($GLOBALS['pt_restrict_field']) && $GLOBALS['pt_restrict_by_id']) {
-        if ($_SESSION{"authUser"} != 'admin' || $GLOBALS['pt_restrict_admin']) {
+        if ($_SESSION["authUser"] != 'admin' || $GLOBALS['pt_restrict_admin']) {
             $where .= "AND ( patient_data." . add_escape_custom($GLOBALS['pt_restrict_field']) .
                     " = ( SELECT facility_id FROM users WHERE username = ?) OR patient_data." .
                     add_escape_custom($GLOBALS['pt_restrict_field']) . " = '' ) ";
-            array_push($sqlBindArray, $_SESSION{"authUser"});
+            array_push($sqlBindArray, $_SESSION["authUser"]);
         }
     }
 
@@ -653,6 +580,8 @@ function getPatientId($pid = "%", $given = "pid, id, lname, fname, mname, provid
     return $returnval;
 }
 
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getByPatientDemographics($searchTerm = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit = "all", $start = "0")
 {
     $layoutCols = sqlStatement(
@@ -685,6 +614,8 @@ function getByPatientDemographics($searchTerm = "%", $given = "pid, id, lname, f
     return $returnval;
 }
 
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getByPatientDemographicsFilter(
     $searchFields,
     $searchTerm = "%",
@@ -755,6 +686,8 @@ function getByPatientDemographicsFilter(
 // return a collection of Patient PIDs
 // new arg style by JRM March 2008
 // orig function getPatientPID($pid = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit="all", $start="0")
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getPatientPID($args)
 {
     $pid = "%";
@@ -841,17 +774,19 @@ function getPatientNameFirstLast($pid)
 }
 
 /* find patient data by DOB */
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getPatientDOB($DOB = "%", $given = "pid, id, lname, fname, mname", $orderby = "lname ASC, fname ASC", $limit = "all", $start = "0")
 {
     $sqlBindArray = array();
     $where = "DOB like ? ";
     array_push($sqlBindArray, $DOB."%");
     if (!empty($GLOBALS['pt_restrict_field'])) {
-        if ($_SESSION{"authUser"} != 'admin' || $GLOBALS['pt_restrict_admin']) {
+        if ($_SESSION["authUser"] != 'admin' || $GLOBALS['pt_restrict_admin']) {
             $where .= "AND ( patient_data." . add_escape_custom($GLOBALS['pt_restrict_field']) .
                     " = ( SELECT facility_id FROM users WHERE username = ?) OR patient_data." .
                     add_escape_custom($GLOBALS['pt_restrict_field']) . " = '' ) ";
-            array_push($sqlBindArray, $_SESSION{"authUser"});
+            array_push($sqlBindArray, $_SESSION["authUser"]);
         }
     }
 
@@ -871,6 +806,8 @@ function getPatientDOB($DOB = "%", $given = "pid, id, lname, fname, mname", $ord
 }
 
 /* find patient data by SSN */
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getPatientSSN($ss = "%", $given = "pid, id, lname, fname, mname, providerID", $orderby = "lname ASC, fname ASC", $limit = "all", $start = "0")
 {
     $sqlBindArray = array();
@@ -891,6 +828,8 @@ function getPatientSSN($ss = "%", $given = "pid, id, lname, fname, mname, provid
 }
 
 //(CHEMED) Search by phone number
+// To prevent sql injection on this function, if a variable is used for $given OR $orderby parameter, then
+// it needs to be escaped via whitelisting prior to using this function.
 function getPatientPhone($phone = "%", $given = "pid, id, lname, fname, mname, providerID", $orderby = "lname ASC, fname ASC", $limit = "all", $start = "0")
 {
     $phone = preg_replace("/[[:punct:]]/", "", $phone);
@@ -908,22 +847,6 @@ function getPatientPhone($phone = "%", $given = "pid, id, lname, fname, mname, p
     }
 
     _set_patient_inc_count($limit, count($returnval), $where, $sqlBindArray);
-    return $returnval;
-}
-
-function getPatientIds($given = "pid, id, lname, fname, mname", $orderby = "id ASC", $limit = "all", $start = "0")
-{
-    $sql="select $given from patient_data order by $orderby";
-
-    if ($limit != "all") {
-        $sql .= " limit " . escape_limit($start) . ", " . escape_limit($limit);
-    }
-
-    $rez = sqlStatement($sql);
-    for ($iter=0; $row=sqlFetchArray($rez); $iter++) {
-        $returnval[$iter]=$row;
-    }
-
     return $returnval;
 }
 
@@ -1055,7 +978,7 @@ function newPatientData(
 
     if (!$db_id) {
       // find the last inserted id for new patient case
-        $db_id = getSqlLastID();
+        $db_id = $id;
     }
 
     $foo = sqlQuery("select pid from patient_data where id=? order by date limit 0,1", array($id));
@@ -1447,7 +1370,7 @@ function getPatientAge($dobYMD, $nowYMD = null)
     $dobYMD = preg_replace("/-/", "", $dobYMD);
     $dobDay = substr($dobYMD, 6, 2);
     $dobMonth = substr($dobYMD, 4, 2);
-    $dobYear = substr($dobYMD, 0, 4);
+    $dobYear = (int) substr($dobYMD, 0, 4);
 
     // set the 'now' date values
     if ($nowYMD == null) {
@@ -1540,20 +1463,19 @@ function getPatientAgeYMD($dob, $date = null)
     //to compensate for 30, 31, 28, 29 days/month
     $mo=$monthnow; //to avoid confusion with later calculation
 
-    if ($mo==05 or $mo==07 or $mo==10 or $mo==12) {  //determined by monthnow-1
-        $nd=30; //nd = number of days in a month, if monthnow is 5, 7, 9, 12 then
-    } // look at April, June, September, November for calculation.  These months only have 30 days.
-    elseif ($mo==03) { // for march, look to the month of February for calculation, check for leap year
+    if ($mo==05 or $mo==07 or $mo==10 or $mo==12) {  // determined by monthnow-1
+        $nd=30; // nd = number of days in a month, if monthnow is 5, 7, 9, 12 then
+    } elseif ($mo==03) { // look at April, June, September, November for calculation.  These months only have 30 days.
+        // for march, look to the month of February for calculation, check for leap year
         $check_leap_Y=$yearnow/4; // To check if this is a leap year.
-        if (is_int($check_leap_Y)) {
+        if (is_int($check_leap_Y)) { // If it true then this is the leap year
             $nd=29;
-        } //If it true then this is the leap year
-        else {
+        } else { // otherwise, it is not a leap year.
             $nd=28;
-        } //otherwise, it is not a leap year.
-    } else {
+        }
+    } else { // other months have 31 days
         $nd=31;
-    } // other months have 31 days
+    }
 
     $bdthisyear=$yearnow.$dobmonth.$dobday; //Date current year's birthday falls on
     if ($datenow < $bdthisyear) { // if patient hasn't had birthday yet this year
@@ -1648,214 +1570,6 @@ function getPatientAgeDisplay($dobYMD, $asOfYMD = null)
 function dateToDB($date)
 {
     $date=substr($date, 6, 4)."-".substr($date, 3, 2)."-".substr($date, 0, 2);
-    return $date;
-}
-
-
-// ----------------------------------------------------------------------------
-/**
- * DROPDOWN FOR COUNTRIES
- *
- * build a dropdown with all countries from geo_country_reference
- *
- * @param int $selected - id for selected record
- * @param string $name - the name/id for select form
- * @return void - just echo the html encoded string
- */
-function dropdown_countries($selected = 0, $name = 'country_code')
-{
-    $r = sqlStatement("SELECT * FROM geo_country_reference ORDER BY countries_name");
-
-    $string = "<select name='" . attr($name) . "' id='" . attr($name) . "'>";
-    while ($row = sqlFetchArray($r)) {
-        $sufix = ( $selected == $row['countries_id']) ? 'selected="selected"' : '';
-        $string .= "<option value='" . attr($row['countries_id']) . "' $sufix>" . text($row['countries_name']) . "</option>";
-    }
-
-    $string .= '</select>';
-    echo $string;
-}
-
-
-// ----------------------------------------------------------------------------
-/**
- * DROPDOWN FOR YES/NO
- *
- * build a dropdown with two options (yes - 1, no - 0)
- *
- * @param int $selected - id for selected record
- * @param string $name - the name/id for select form
- * @return void - just echo the html encoded string
- */
-function dropdown_yesno($selected = 0, $name = 'yesno')
-{
-    $string = "<select name='" . attr($name) . "' id='" . attr($name) . "'>";
-
-    $selected = (int)$selected;
-    if ($selected == 0) {
-        $sel1 = 'selected="selected"';
-        $sel2 = '';
-    } else {
-        $sel2 = 'selected="selected"';
-        $sel1 = '';
-    }
-
-        $string .= "<option value='0' $sel1>" .xlt('No'). "</option>";
-        $string .= "<option value='1' $sel2>" .xlt('Yes'). "</option>";
-        $string .= '</select>';
-
-        echo $string;
-}
-
-// ----------------------------------------------------------------------------
-/**
- * DROPDOWN FOR MALE/FEMALE options
- *
- * build a dropdown with three options (unselected/male/female)
- *
- * @param int $selected - id for selected record
- * @param string $name - the name/id for select form
- * @return void - just echo the html encoded string
- */
-function dropdown_sex($selected = 0, $name = 'sex')
-{
-    $string = "<select name='" . attr($name) . "' id='" . attr($name) . "'>";
-
-    if ($selected == 1) {
-        $sel1 = 'selected="selected"';
-        $sel2 = '';
-        $sel0 = '';
-    } elseif ($selected == 2) {
-        $sel2 = 'selected="selected"';
-        $sel1 = '';
-        $sel0 = '';
-    } else {
-            $sel0 = 'selected="selected"';
-            $sel1 = '';
-            $sel2 = '';
-    }
-
-        $string .= "<option value='0' $sel0>" .xlt('Unselected'). "</option>";
-        $string .= "<option value='1' $sel1>" .xlt('Male'). "</option>";
-        $string .= "<option value='2' $sel2>" .xlt('Female'). "</option>";
-        $string .= '</select>';
-
-        echo $string;
-}
-
-// ----------------------------------------------------------------------------
-/**
- * DROPDOWN FOR MARITAL STATUS
- *
- * build a dropdown with marital status
- *
- * @param int $selected - id for selected record
- * @param string $name - the name/id for select form
- * @return void - just echo the html encoded string
- */
-function dropdown_marital($selected = 0, $name = 'status')
-{
-    $string = "<select name='" . attr($name) . "' id='" . attr($name) . "'>";
-
-    $statii = array('married','single','divorced','widowed','separated','domestic partner');
-
-    foreach ($statii as $st) {
-        $sel = ( $st == $selected ) ? 'selected="selected"' : '';
-        $string .= '<option value="' . attr($st) . '" '.$sel.' >' .xlt($st). '</option>';
-    }
-
-    $string .= '</select>';
-
-    echo $string;
-}
-
-// ----------------------------------------------------------------------------
-/**
- * DROPDOWN FOR PROVIDERS
- *
- * build a dropdown with all providers
- *
- * @param int $selected - id for selected record
- * @param string $name - the name/id for select form
- * @return void - just echo the html encoded string
- */
-function dropdown_providers($selected = 0, $name = 'status')
-{
-    $provideri = getProviderInfo();
-
-    $string = "<select name='" . attr($name) . "' id='" . attr($name) . "'>";
-    $string .= '<option value="">' .xlt('Unassigned'). '</option>';
-    foreach ($provideri as $s) {
-        $sel = ( $s['id'] == $selected ) ? 'selected="selected"' : '';
-        $string .= '<option value="' . attr($s['id']) . '" '.$sel.' >' . text(ucwords($s['fname']." ".$s['lname'])) . '</option>';
-    }
-
-    $string .= '</select>';
-
-    echo $string;
-}
-
-// ----------------------------------------------------------------------------
-/**
- * DROPDOWN FOR INSURANCE COMPANIES
- *
- * build a dropdown with all insurers
- *
- * @param int $selected - id for selected record
- * @param string $name - the name/id for select form
- * @return void - just echo the html encoded string
- */
-function dropdown_insurance($selected = 0, $name = 'iprovider')
-{
-    $insurancei = getInsuranceProviders();
-
-    $string = "<select name='" . attr($name) . "' id='" . attr($name) . "'>";
-    $string .= '<option value="0">Onbekend</option>';
-    foreach ($insurancei as $iid => $iname) {
-        $sel = ( strtolower($iid) == strtolower($selected) ) ? 'selected="selected"' : '';
-        $string .= '<option value="' . attr($iid) . '" '.$sel.' >' . text($iname) . '(' . text($iid) . ')</option>';
-    }
-
-    $string .= '</select>';
-
-    echo $string;
-}
-
-
-// ----------------------------------------------------------------------------
-/**
- * COUNTRY CODE
- *
- * return the name or the country code, function of arguments
- *
- * @param int $country_code
- * @param string $country_name
- * @return string | int - name or code
- */
-function country_code($country_code = 0, $country_name = '')
-{
-    $strint = '';
-    $sqlBindArray = array();
-    if ($country_code) {
-        $sql = "SELECT countries_name AS res FROM geo_country_reference WHERE countries_id = ?";
-        array_push($sqlBindArray, $country_code);
-    } else {
-        $sql = "SELECT countries_id AS res FROM geo_country_reference WHERE countries_name = ?";
-        array_push($sqlBindArray, $country_name);
-    }
-
-    $db = $GLOBALS['adodb']['db'];
-    $result = $db->Execute($sql, $sqlBindArray);
-    if ($result && !$result->EOF) {
-        $strint = $result->fields['res'];
-    }
-
-    return $strint;
-}
-
-function DBToDate($date)
-{
-    $date=substr($date, 5, 2)."/".substr($date, 8, 2)."/".substr($date, 0, 4);
     return $date;
 }
 
@@ -1954,8 +1668,11 @@ function get_patient_balance($pid, $with_insurance = false, $eid = false)
                 "pid = ? AND encounter = ? AND payer_type = 0",
                 array($pid, $encounter)
             );
-            $ptbal = $insarr[0]['copay'] + $brow['amount'] - $drow['payments'];
-            if ($ptbal > 0) {
+            $copay = !empty($insarr[0]['copay']) ? $insarr[0]['copay'] * 1 : 0;
+            $amt = !empty($brow['amount']) ? $brow['amount'] * 1 : 0;
+            $pay = !empty($drow['payments']) ? $drow['payments'] * 1 : 0;
+            $ptbal = $copay + $amt - $pay;
+            if ($ptbal) { // @TODO check if we want to show patient payment credits.
                 $balance += $ptbal;
             }
         } else {
@@ -1993,8 +1710,9 @@ function is_patient_deceased($pid, $date = '')
   // Query for deceased status (if person is deceased gets days_deceased and date_deceased)
     $results = sqlQuery("SELECT DATEDIFF(?,`deceased_date`) AS `days_deceased`, `deceased_date` AS `date_deceased` " .
                       "FROM `patient_data` " .
-                      "WHERE `pid` = ? AND `deceased_date` IS NOT NULL AND `deceased_date` != '0000-00-00 00:00:00' AND 
-                      `deceased_date` <= ?", array($date,$pid,$date));
+                      "WHERE `pid` = ? AND " .
+                      dateEmptySql('deceased_date', true, true) .
+                      "AND `deceased_date` <= ?", array($date,$pid,$date));
 
     if (empty($results)) {
         // Patient is alive, so return false

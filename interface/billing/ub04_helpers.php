@@ -2,12 +2,15 @@
 /**
  * Helper for UB04 form.
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Jerry Padgett <sjpadgett@gmail.com>
- * @copyright Copyright (c) 2017 Jerry Padgett <sjpadgett@gmail.com>
- * @license https://www.gnu.org/licenses/agpl-3.0.en.html GNU Affero General Public License 3
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Jerry Padgett <sjpadgett@gmail.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2019 Jerry Padgett <sjpadgett@gmail.com>
+ * @copyright Copyright (c) 2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
 require_once("../globals.php");
 require_once("ub04_codes.inc.php");
 
@@ -26,16 +29,15 @@ $users = sqlStatementNoLog("SELECT id,fname,lname,npi,taxonomy FROM users WHERE 
 <script>
 function sendSelection(value)
 {
-    var parentId = <?php echo json_encode($_GET['formid']); ?>;
-    //window.opener.updateValue(parentId, value);
-    //window.close();
+    let parentId = <?php echo js_escape($_GET['formid']); ?>;
+
     updateProvider(parentId, value);
-    eModal.close();
+    dialog.closeAjax();
 }
 </script>
 </head>
 <body>
-<table class="table table-striped">
+<table class="table table-sm table-striped">
     <thead>
         <tr>
             <th><?php echo xlt('Provider')?></th>
@@ -48,9 +50,9 @@ function sendSelection(value)
 <?php
 while ($row = sqlFetchArray($users)) {
     $data = json_encode($row);
-?>
+    ?>
 <tr>
-    <td><button onclick='sendSelection(<?php echo $data;?>)'><?php echo text($row['fname'] . ' ' . $row['lname'])?></button></td>
+    <td><button btn btn-secondary btn-sm onclick='sendSelection(<?php echo $data;?>)'><?php echo text($row['fname'] . ' ' . $row['lname'])?></button></td>
     <td><?php echo text($row['id']) ?></td>
     <td><?php echo text($row['npi']) ?></td>
     <td><?php echo text($row['taxonomy']) ?></td>

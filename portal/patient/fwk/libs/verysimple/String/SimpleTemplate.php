@@ -56,8 +56,8 @@ class SimpleTemplate
         $txt = str_replace('&amp;', '&', $txt);
         
         // Ajdusts links - anything starting with HTTP opens in a new window
-        // $txt = str_ireplace("<a href=\"http://","<a target=\"_blank\" href=\"http://",$txt);
-        // $txt = str_ireplace("<a href=http://","<a target=\"_blank\" href=http://",$txt);
+        // $txt = str_ireplace("<a href=\"http://","<a rel=\"noopener\" target=\"_blank\" href=\"http://",$txt);
+        // $txt = str_ireplace("<a href=http://","<a rel=\"noopener\" target=\"_blank\" href=http://",$txt);
         
         // Basic formatting
         $eol = (strpos($txt, "\r") === false) ? "\n" : "\r\n";
@@ -66,7 +66,7 @@ class SimpleTemplate
         $html = str_replace("</p>", "</p>\n\n", $html);
         $html = str_replace("<p></p>", "<p>&nbsp;</p>", $html);
         
-        // Wipes <br> after block tags (for when the user includes some html in the text).
+        // Wipes <br /> after block tags (for when the user includes some html in the text).
         $wipebr = array (
                 "table",
                 "tr",

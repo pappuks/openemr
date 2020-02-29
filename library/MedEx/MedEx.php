@@ -24,7 +24,7 @@
      * @author MedEx <support@MedExBank.com>
      * @link    http://www.MedExBank.com
      * @copyright Copyright (c) 2017 MedEx <support@MedExBank.com>
-     * @license https://www.gnu.org/licenses/agpl-3.0.en.html GNU Affero General Public License 3
+     * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
      */
 
     $ignoreAuth=true;
@@ -32,27 +32,11 @@
 
     require_once(dirname(__FILE__)."/../../interface/globals.php");
     require_once(dirname(__FILE__)."/../patient.inc");
-    require_once(dirname(__FILE__)."/../log.inc");
     require_once(dirname(__FILE__)."/API.php");
-
-    $MedEx = new MedExApi\MedEx('MedExBank.com');
-    $logged_in = $MedEx->login();
     
-if (($logged_in) && (!empty($_POST['callback_key']))) {
-    $response = array();
-    $data                   = json_decode($_POST, true);
-    $token                  = $logged_in['token'];
-      
-    $callback               = $MedEx->callback->receive($data);
-    $practice               = $MedEx->practice->sync($token);
-    $campaigns              = $MedEx->campaign->events($token);
-    $generate               = $MedEx->events->generate($token, $campaigns['events']);
-      
-    $response['generate']   = $generate;
-    $response['campaigns']  = $campaigns;
-    $response['practice']   = $practice;
-    $response['success']    = "200";
-        
+if (!empty($_POST['callback_key'])) {
+    $MedEx = new MedExApi\MedEx('MedExBank.com');
+    $response = $MedEx->login('1');
     header('Content-type: application/json');
     echo json_encode($response);
     exit;

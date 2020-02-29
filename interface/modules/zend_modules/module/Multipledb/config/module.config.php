@@ -16,13 +16,28 @@
  * +------------------------------------------------------------------------------+
  *
  */
+namespace Multipledb;
+
+use Laminas\ServiceManager\Factory\InvokableFactory;
+use Laminas\Router\Http\Segment;
+use Multipledb\Controller\MultipledbController;
+use Multipledb\Controller\ModuleconfigController;
+use Multipledb\Model\Multipledb;
+use Multipledb\Model\MultipledbTable;
+use Laminas\Db\ResultSet\ResultSet;
+use Laminas\Db\TableGateway\TableGateway;
+use Interop\Container\ContainerInterface;
+
 return array(
 
     /* declare all controllers */
     'controllers' => array(
-        'invokables' => array(
-            'Multipledb\Controller\Multipledb' => 'Multipledb\Controller\MultipledbController',
-        ),
+        'factories' => [
+            MultipledbController::class => function (ContainerInterface $container, $requestedName) {
+                return new MultipledbController($container->get(MultipledbTable::class));
+            },
+            ModuleconfigController::class => InvokableFactory::class
+        ],
     ),
 
     /**
@@ -32,7 +47,7 @@ return array(
     'router' => array(
         'routes' => array(
             'multipledb' => array(
-                'type'    => 'segment',
+                'type'    => Segment::class,
                 'options' => array(
                     'route'    => '/multipledb[/:action][/:id]',
                     'constraints' => array(
@@ -40,7 +55,7 @@ return array(
                         'id'     => '[0-9]+',
                     ),
                     'defaults' => array(
-                        'controller' => 'Multipledb\Controller\multipledb',
+                        'controller' => MultipledbController::class,
                         'action'     => 'index',
                     ),
                 ),
@@ -55,5 +70,18 @@ return array(
         ),'template_map' => array(
             'multipledb/layout/layout' => __DIR__ . '/../view/layout/layout.phtml',
         )
-    )
+    ),
+    'service_manager' => [
+        'factories' => array(
+            MultipledbTable::class =>  function (ContainerInterface $container, $requestedName) {
+                $dbAdapter = $container->get(\Laminas\Db\Adapter\Adapter::class);
+                $resultSetPrototype = new ResultSet();
+                $resultSetPrototype->setArrayObjectPrototype(new Multipledb());
+                $tableGateway = new TableGateway('multiple_db', $dbAdapter, null, $resultSetPrototype);
+                $table = new MultipledbTable($tableGateway);
+                return $table;
+            }
+            ,ModuleconfigController::class => InvokableFactory::class
+        ),
+    ]
 );

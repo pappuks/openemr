@@ -28,15 +28,15 @@
 /*LBF form take the valude from the global $GLOBALS['new_validate'];*/
 /*Other pages depend if the page in the lists options (page validation)is active and exists)*/
 if ($use_validate_js) {
-?>
+    ?>
     <script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative'] ?>/moment/moment.js"></script>
     <script type="text/javascript" src="<?php echo $GLOBALS['rootdir'] ?>/../library/js/vendors/validate/validate_modified.js"></script>
     <script type="text/javascript" src="<?php echo $GLOBALS['rootdir'] ?>/../library/js/vendors/validate/validate_extend.js"></script>
-<?php
+    <?php
 }
 ?>
 
-<script language='JavaScript'>
+<script>
     <?php /*Added 2 parameters to the already existing submitme form*/
     /*new validate: Use the new validation library (comes from globals)*/
     /*e: event*/
@@ -174,7 +174,7 @@ function submitme(new_validate,e,form_id, constraints) {
                 if($(parent_div).is('div')) {
                     var div_id = $(parent_div).attr('id');
                     var type_tab = div_id.substr(4);
-                    $('a#header_tab_'+type_tab).css('color', 'red');
+                    $('a#header_tab_'+type_tab).css('color', 'var(--danger)');
                  }
 
                 //open tab for new patient form
@@ -215,7 +215,7 @@ function submitme(new_validate,e,form_id, constraints) {
                 if($(parent_div).is('div')) {
                     var div_id = $(parent_div).attr('id');
                     var type_tab = div_id.substr(4);
-                    $('a#header_tab_'+type_tab).css('color', 'black');
+                    $('a#header_tab_'+type_tab).css('color', 'var(--black)');
                 }
             }
             /*
@@ -229,25 +229,25 @@ function submitme(new_validate,e,form_id, constraints) {
                 // console.log(message);
                 switch (message){
                     case 'Patient Name Required':
-                        return '<?php echo xla('Patient Name Required');?>';
+                        return <?php echo xlj('Patient Name Required');?>;
                     case 'An end date later than the start date is required for repeated events!':
-                       return '<?php echo xla('An end date later than the start date is required for repeated events!');?>';
+                       return <?php echo xlj('An end date later than the start date is required for repeated events!');?>;
                     case 'Required field missing: Please enter the User Name':
-                        return '<?php echo xla('Required field missing: Please enter the User Name', 'e');?>';
+                        return <?php echo xlj('Required field missing: Please enter the User Name');?>;
                     case 'Please enter the password':
-                        return '<?php echo xla('Please enter the password'); ?>';
+                        return <?php echo xlj('Please enter the password'); ?>;
                     case 'Required field missing: Please enter the First name':
-                        return '<?php echo xla('Required field missing: Please enter the First name');?>';
+                        return <?php echo xlj('Required field missing: Please enter the First name');?>;
                     case 'Required field missing: Please enter the Last name':
-                        return '<?php echo xla('Required field missing: Please enter the Last name');?>';
+                        return <?php echo xlj('Required field missing: Please enter the Last name');?>;
                     case 'Please choose a patient':
-                        return '<?php echo xla('Please choose a patient');?>';
+                        return <?php echo xlj('Please choose a patient');?>;
                     case 'Must be future date':
-                        return '<?php echo xla('Must be future date');?>';
+                        return <?php echo xlj('Must be future date');?>;
                     case 'Recipient required unless status is Done':
-                        return '<?php echo xla('Recipient required unless status is Done');?>';
+                        return <?php echo xlj('Recipient required unless status is Done');?>;
                     default:
-                       return '<?php echo xla('is not valid');?>';
+                       return <?php echo xlj('is not valid');?>;
                 }
             }
             //the result of validation
@@ -255,7 +255,7 @@ function submitme(new_validate,e,form_id, constraints) {
         }
     }
     //enable submit button until load submitme function
-    if(document.getElementById('submit_btn') != null){
+    if(document.getElementById('submit_btn') != null) {
         document.getElementById('submit_btn').disabled = false;
     }
 </script>

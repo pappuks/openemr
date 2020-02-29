@@ -26,7 +26,7 @@
 //
 // +------------------------------------------------------------------------------+
 
-
+use OpenEMR\Billing\InvoiceSummary;
 
 global $ISSUE_TYPES;
 $ignoreAuth=true;
@@ -35,7 +35,6 @@ ob_start();
 require_once("../../interface/globals.php");
 require_once(dirname(__FILE__)."/../../controllers/C_Document.class.php");
 require_once(dirname(__FILE__)."/../../library/options.inc.php");
-require_once(dirname(__FILE__) . "/../../library/log.inc");
 require_once(dirname(__FILE__) . "/../../library/patient.inc");
 require_once(dirname(__FILE__) . "/../../library/direct_message_check.inc");
 
@@ -540,14 +539,12 @@ class UserService extends Userforms
     {
         global $pid;
         if (UserService::valid($data_credentials)) {
-            require_once("../../library/invoice_summary.inc.php");
             require_once("../../library/options.inc.php");
-            require_once("../../library/acl.inc");
             require_once("../../library/patient.inc");
-            if ($func=='ar_responsible_party') {
+            if ($func=='InvoiceSummary::ar_responsible_party') {
                 $patient_id=$pid;
                 $encounter_id=$var['encounter'];
-                $x['ar_responsible_party']=ar_responsible_party($patient_id, $encounter_id);
+                $x['ar_responsible_party'] = InvoiceSummary::ar_responsible_party($patient_id, $encounter_id);
                 return UserService::function_return_to_xml($x);
             } elseif ($func=='getInsuranceData') {
                 $type=$var['type'];
@@ -641,7 +638,7 @@ class UserService extends Userforms
             $username=$var['username'];
             $authPass=$var['authPass'];
             $query="insert into patient_access_offsite(pid,portal_username,portal_pwd) values (?,?,?)";
-            sqlInsert($query, array($pid,$username,$authPass));
+            sqlStatement($query, array($pid,$username,$authPass));
         } else {
             throw new SoapFault("Server", "credentials failed");
         }
@@ -826,7 +823,7 @@ class UserService extends Userforms
     {
          global $pid,$auditmasterid;
         if (UserService::valid($data[0])=='existingpatient' || UserService::valid($data[0])=='newpatient') {
-            sqlInsert("INSERT INTO documents_legal_detail (dld_pid,dld_signed,dld_filepath,dld_master_docid,dld_filename,dld_encounter,dld_file_for_pdf_generation) ".
+            sqlStatement("INSERT INTO documents_legal_detail (dld_pid,dld_signed,dld_filepath,dld_master_docid,dld_filename,dld_encounter,dld_file_for_pdf_generation) ".
             " VALUES (?,?,?,?,?,?,?)", array($pid,$data[2],$data[3],$data[4],$data[5],$data[6],$data[7]));
         } elseif (UserService::valid($data[0])=='newpatienttoapprove') {
             $param=array($data[0],'audit_master_id_to_delete'=>"",'pid'=>"$pid",'approval_status'=>'1',
@@ -1063,7 +1060,7 @@ class UserService extends Userforms
         if (UserService::valid($data_credentials)) {
             $authorizenetid=$var['authorizenetid'];
             $query="UPDATE patient_access_offsite SET authorize_net_id = ? WHERE pid = ?";
-            sqlInsert($query, array($authorizenetid,$pid));
+            sqlStatement($query, array($authorizenetid,$pid));
         } else {
             throw new SoapFault("Server", "credentials failed");
         }

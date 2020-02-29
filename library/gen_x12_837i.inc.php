@@ -3,13 +3,11 @@
  * X12 837I
  *
  * @package OpenEMR
- * @link    http://www.open-emr.org
+ * @link    https://www.open-emr.org
  * @author  Jerry Padgett <sjpadgett@gmail.com>
  * @copyright Copyright (c) 2017 Jerry Padgett <sjpadgett@gmail.com>
  * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
-
-require_once(dirname(__FILE__) . "/invoice_summary.inc.php");
 
 use OpenEMR\Billing\Claim;
 
@@ -157,7 +155,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
         $out .= "N4" .
             "*" . $claim->billingFacilityCity() .
             "*" . $claim->billingFacilityState() .
-            "*" . stripZipCode($claim->billingFacilityZip()) .
+            "*" . $claim->x12Zip($claim->billingFacilityZip()) .
             "~\n";
     if ($claim->billingFacilityNPI() && $claim->billingFacilityETIN()) {
         ++$edicount;
@@ -247,7 +245,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
         $out .= "N4" .
             "*" . $claim->insuredCity() .
             "*" . $claim->insuredState() .
-            "*" . stripZipCode($claim->insuredZip()) .
+            "*" . $claim->x12Zip($claim->insuredZip()) .
             "~\n";
         ++$edicount;
         $out .= "DMG" .
@@ -273,7 +271,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
             "*" . ($encounter_claim ? $claim->payerAltID() : $claim->payerID()) .
             "~\n";
     if (!$claim->payerID()) {
-        $log .= "*** CMS ID is missing for payer '" . $claim->payerName() . "'.\n";
+        $log .= "*** Payer ID is missing for payer '" . $claim->payerName() . "'.\n";
     }
 
         ++$edicount;
@@ -284,7 +282,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
         $out .= "N4" .
             "*" . $claim->payerCity() .
             "*" . $claim->payerState() .
-            "*" . stripZipCode($claim->payerZip()) .
+            "*" . $claim->x12Zip($claim->payerZip()) .
             "~\n";
 
         // Segment REF (Payer Secondary Identification) omitted.
@@ -322,7 +320,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
             $out .= "N4" .
                 "*" . $claim->patientCity() .
                 "*" . $claim->patientState() .
-                "*" . stripZipCode($claim->patientZip()) .
+                "*" . $claim->x12Zip($claim->patientZip()) .
                 "~\n";
             ++$edicount;
             $out .= "DMG" .
@@ -808,7 +806,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
         }
         if ($claim->facilityState()) {
             ++ $edicount;
-            $out .= "N4" . "*" . $claim->facilityCity() . "*" . $claim->facilityState() . "*" . stripZipCode($claim->facilityZip()) . "~\n";
+            $out .= "N4" . "*" . $claim->facilityCity() . "*" . $claim->facilityState() . "*" . $claim->x12Zip($claim->facilityZip()) . "~\n";
         }
     }
 
@@ -935,7 +933,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
         $out .= "N4" .
             "*" . $claim->insuredCity($ins) .
             "*" . $claim->insuredState($ins) .
-            "*" . stripZipCode($claim->insuredZip($ins)) .
+            "*" . $claim->x12Zip($claim->insuredZip($ins)) .
             "~\n";
 
         // Segment REF (Other Subscriber Secondary Identification) omitted.
@@ -954,7 +952,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
             "~\n";
 
         if (!$claim->payerID($ins)) {
-            $log .= "*** CMS ID is missing for payer '" . $claim->payerName($ins) . "'.\n";
+            $log .= "*** Payer ID is missing for payer '" . $claim->payerName($ins) . "'.\n";
         }
 
         ++$edicount;
@@ -966,7 +964,7 @@ function generate_x12_837I($pid, $encounter, &$log, $ub04id)
         $out .= "N4" .
             "*" . $claim->payerCity($ins) .
             "*" . $claim->payerState($ins) .
-            "*" . stripZipCode($claim->payerZip($ins)) .
+            "*" . $claim->x12Zip($claim->payerZip($ins)) .
             "~\n";
 
         // Segment DTP*573 (Claim Check or Remittance Date) omitted.

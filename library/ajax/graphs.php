@@ -2,17 +2,24 @@
 /**
  * Flexible script for graphing entities in OpenEMR.
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Brady Miller <brady.g.miller@gmail.com>
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
- * @copyright Copyright (c) 2010-2017 Brady Miller <brady.g.miller@gmail.com>
+ * @package   OpenEMR
+ * @link      https://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2011 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2010-2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
 require_once(dirname(__FILE__) . "/../../interface/globals.php");
+
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+
+if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
+}
 
 // Collect passed variable(s)
 //  $table is the sql table (or form name if LBF)
@@ -27,8 +34,8 @@ $is_lbf = substr($table, 0, 3) === 'LBF';
 // acl checks here
 //  For now, only allow access for med aco.
 //  This can be expanded depending on which table is accessed.
-if (!acl_check('patients', 'med')) {
-      exit;
+if (!AclMain::aclCheckCore('patients', 'med')) {
+    exit;
 }
 
 // Conversion functions/constants
@@ -83,10 +90,10 @@ function graphsGetValues($name)
         //  (Note am skipping values of zero, this could be made to be
         //   optional in the future when using lab values)
         $values = SqlStatement("SELECT " .
-        add_escape_custom($name) . ", " .
+            escape_sql_column_name($name, array($table)) . ", " .
         "date " .
-        "FROM " . add_escape_custom($table) . " " .
-        "WHERE " . add_escape_custom($name) . " != 0 " .
+        "FROM " . escape_table_name($table) . " " .
+        "WHERE " . escape_sql_column_name($name, array($table)) . " != 0 " .
         "AND pid = ? ORDER BY date", array($pid));
     }
 

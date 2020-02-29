@@ -6,8 +6,10 @@
  * @link      http://www.open-emr.org
  * @author    Rod Roark <rod@sunsetsystems.com>
  * @author    Stephen Waite <stephen.waite@cmsvt.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2015-2017 Rod Roark <rod@sunsetsystems.com>
  * @copyright Copyright (c) 2018 Stephen Waite <stephen.waite@cmsvt.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
@@ -15,9 +17,13 @@ require_once("../../globals.php");
 require_once("../../../custom/code_types.inc.php");
 require_once("$srcdir/options.inc.php");
 
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
 // gacl control
-$thisauthview = acl_check('admin', 'superbill', false, 'view');
-$thisauthwrite = acl_check('admin', 'superbill', false, 'write');
+$thisauthview = AclMain::aclCheckCore('admin', 'superbill', false, 'view');
+$thisauthwrite = AclMain::aclCheckCore('admin', 'superbill', false, 'write');
 
 if (!($thisauthwrite || $thisauthview)) {
     echo "<html>\n<body>\n";
@@ -58,6 +64,10 @@ $financial_reporting = 0;
 $revenue_code = '';
 
 if (isset($mode) && $thisauthwrite) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+
     $code_id    = empty($_POST['code_id']) ? '' : $_POST['code_id'] + 0;
     $code       = $_POST['code'];
     $code_type  = $_POST['code_type'];
@@ -102,7 +112,7 @@ if (isset($mode) && $thisauthwrite) {
                 "active = "        . add_escape_custom($active) . ", " .
                 "financial_reporting = " . add_escape_custom($financial_reporting) . ", " .
                 "revenue_code = '" . ffescape($revenue_code) . "', " .
-                "reportable = "    . add_escape_custom($reportable);
+                "reportable = '"    . add_escape_custom($reportable) . "' ";
             if ($code_id) {
                 $query = "UPDATE codes SET $sql WHERE id = ?";
                 sqlStatement($query, array($code_id));
@@ -176,7 +186,7 @@ if (isset($mode) && $thisauthwrite) {
 
     // If codes history is enabled in the billing globals save data to codes history table
     if ($GLOBALS['save_codes_history'] && $alertmsg=='' &&
-        ( $mode == "add" || $mode == "modify_complete" || $mode == "delete" ) ) {
+        ( $mode == "add" || $mode == "modify_complete" || $mode == "delete" )) {
         $action_type= empty($_POST['code_id']) ? 'new' : $mode;
         $action_type= ($action_type=='add') ? 'update' : $action_type ;
         $code       = $_POST['code'];
@@ -272,14 +282,9 @@ if ($fend > $count) {
 <html>
 <head>
     <title><?php echo xlt("Codes"); ?></title>
-    <?php html_header_show(); ?>
 
-    <link rel="stylesheet" href="<?php echo attr($css_header);?>" type="text/css">
-    <script type="text/javascript" src="../../../library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
-    <script type="text/javascript" src="../../../library/textformat.js"></script>
-    <script type="text/JavaScript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery/dist/jquery.min.js"></script>
-    <link href="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-ui-themes/themes/base/jquery-ui.min.css" rel="stylesheet" type="text/css" />
-    <script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative'] ?>/jquery-ui/jquery-ui.min.js"></script>
+    <?php Header::setupHeader(['jquery-ui', 'jquery-ui-base']); ?>
+
 <style>
     .ui-autocomplete { max-height: 350px; max-width: 35%; overflow-y: auto; overflow-x: hidden; }
 </style>
@@ -355,7 +360,7 @@ if ($fend > $count) {
                 ?>
             }
             if (!codetype) {
-                alert('<?php echo addslashes(xl('This code type does not accept relations.')); ?>');
+                alert(<?php echo xlj('This code type does not accept relations.'); ?>);
                 return;
             }
             dlgopen('find_code_dynamic.php', '_blank', 900, 600);
@@ -364,12 +369,12 @@ if ($fend > $count) {
         // Some validation for saving a new code entry.
         function validEntry(f) {
             if (!f.code.value) {
-                alert('<?php echo addslashes(xl('No code was specified!')); ?>');
+                alert(<?php echo xlj('No code was specified!'); ?>);
                 return false;
             }
             <?php if ($GLOBALS['ippf_specific']) { ?>
             if (f.code_type.value == 12 && !f.related_code.value) {
-                alert('<?php echo addslashes(xl('A related IPPF code is required!')); ?>');
+                alert(<?php echo xlj('A related IPPF code is required!'); ?>);
                 return false;
             }
             <?php } ?>
@@ -387,7 +392,7 @@ if ($fend > $count) {
         function submitUpdate() {
             var f = document.forms[0];
             if (! parseInt(f.code_id.value)) {
-                alert('<?php echo addslashes(xl('Cannot update because you are not editing an existing entry!')); ?>');
+                alert(<?php echo xlj('Cannot update because you are not editing an existing entry!'); ?>);
                 return;
             }
             if (!validEntry(f)) return;
@@ -438,9 +443,9 @@ if ($fend > $count) {
             var ctid = document.forms[0].code_type.value;
             <?php
             foreach ($code_types as $key => $value) {
-                $ctid   = attr($value['id']);
-                $ctmask = attr($value['mask']);
-                echo " if (ctid == '$ctid') return '$ctmask';\n";
+                $ctid   = $value['id'];
+                $ctmask = $value['mask'];
+                echo " if (ctid == " . js_escape($ctid) . ") return " . js_escape($ctmask) . ";\n";
             }
             ?>
             return '';
@@ -452,16 +457,17 @@ if ($fend > $count) {
 <body class="body_top" >
 
 <form method='post' action='superbill_custom_full.php' name='theform'>
+    <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
     <input type='hidden' name='mode' value=''>
 
-    <br>
+    <br />
 
     <center>
         <table border='0' cellpadding='0' cellspacing='0'>
 
             <tr>
-                <td colspan="3"> <?php echo xlt('Not all fields are required for all codes or code types.'); ?><br><br></td>
+                <td colspan="3"> <?php echo xlt('Not all fields are required for all codes or code types.'); ?><br /><br /></td>
             </tr>
 
             <tr>
@@ -480,12 +486,12 @@ if ($fend > $count) {
                                 <?php if ($mode != "modify") { ?>
                                     <option value="<?php  echo attr($value['id']) ?>"<?php if ($code_type == $value['id']) {
                                         echo " selected";
-} ?>><?php echo xlt($value['label']) ?></option>
+                                                   } ?>><?php echo xlt($value['label']) ?></option>
                                 <?php } ?>
                             <?php } ?>
                             <?php if ($value['external']) {
                                 array_push($external_sets, $key);
-} ?>
+                            } ?>
                         <?php } // end foreach ?>
 
                         <?php if ($mode != "modify") { ?>
@@ -494,7 +500,7 @@ if ($fend > $count) {
 
                     <?php if ($mode == "modify") { ?>
                         <input type='text' size='4' name='code_type' readonly='readonly' style='display:none' value='<?php echo attr($code_type) ?>' />
-                        <?php echo attr($code_type_name_external) ?>
+                        <?php echo text($code_type_name_external) ?>
                     <?php } ?>
 
                     &nbsp;&nbsp;
@@ -523,7 +529,7 @@ if ($fend > $count) {
                     &nbsp;&nbsp;
                     <input type='checkbox' name='active' value='1'<?php if (!empty($active) || ($mode == 'modify' && $active == null)) {
                         echo ' checked';
-} ?> />
+                                                                  } ?> />
                     <?php echo xlt('Active'); ?>
                 </td>
             </tr>
@@ -556,21 +562,21 @@ if ($fend > $count) {
                     generate_form_field(array('data_type'=>1,'field_id'=>'superbill','list_id'=>'superbill'), $superbill);
                     ?>
                     &nbsp;&nbsp;
-                    <input type='checkbox' title='<?php echo xlt("Syndromic Surveillance Report") ?>' name='reportable' value='1'<?php if (!empty($reportable)) {
+                    <input type='checkbox' title='<?php echo xla("Syndromic Surveillance Report") ?>' name='reportable' value='1'<?php if (!empty($reportable)) {
                         echo ' checked';
-} ?> />
+                                                  } ?> />
                     <?php echo xlt('Diagnosis Reporting'); ?>
                     &nbsp;&nbsp;&nbsp;&nbsp;
-                    <input type='checkbox' title='<?php echo xlt("Service Code Finance Reporting") ?>' name='financial_reporting' value='1'<?php if (!empty($financial_reporting)) {
+                    <input type='checkbox' title='<?php echo xla("Service Code Finance Reporting") ?>' name='financial_reporting' value='1'<?php if (!empty($financial_reporting)) {
                         echo ' checked';
-} ?> />
+                                                  } ?> />
                     <?php echo xlt('Service Reporting'); ?>
                 </td>
             </tr>
 
             <tr<?php if (empty($GLOBALS['ippf_specific'])) {
                 echo " style='display:none'";
-} ?>>
+               } ?>>
                 <td><?php echo xlt('CYP Factor'); ?>:</td>
                 <td></td>
                 <td>
@@ -581,7 +587,7 @@ if ($fend > $count) {
 
             <tr<?php if (!related_codes_are_used()) {
                 echo " style='display:none'";
-} ?>>
+               } ?>>
                 <td><?php echo xlt('Relate To'); ?>:</td>
                 <td></td>
                 <td>
@@ -641,12 +647,12 @@ if ($fend > $count) {
                         <?php echo $taxline ?>
                     </td>
                 </tr>
-            <?php
+                <?php
             } ?>
 
             <tr>
                 <td colspan="3" align="center">
-                    <input type="hidden" name="code_id" value="<?php echo attr($code_id) ?>"><br>
+                    <input type="hidden" name="code_id" value="<?php echo attr($code_id) ?>"><br />
                     <input type="hidden" name="code_type_name_external" value="<?php echo attr($code_type_name_external) ?>">
                     <input type="hidden" name="code_external" value="<?php echo attr($code_external) ?>">
                     <?php if ($thisauthwrite) { ?>
@@ -661,7 +667,7 @@ if ($fend > $count) {
                 </td>
             </tr>
         </table>
-        <br>
+        <br />
         <table border='0' cellpadding='5' cellspacing='0' width='96%'>
             <tr>
 
@@ -682,28 +688,28 @@ if ($fend > $count) {
 
                     <input type="text" name="search" size="5" value="<?php echo attr($search) ?>">&nbsp;
                     <input type="submit" name="go" value='<?php echo xla('Search'); ?>'>&nbsp;&nbsp;
-                    <input type='checkbox' title='<?php echo xlt("Only Show Diagnosis Reporting Codes") ?>' name='search_reportable' value='1'<?php if (!empty($search_reportable)) {
+                    <input type='checkbox' title='<?php echo xla("Only Show Diagnosis Reporting Codes") ?>' name='search_reportable' value='1'<?php if (!empty($search_reportable)) {
                         echo ' checked';
-} ?> />
+                                                  } ?> />
                     <?php echo xlt('Diagnosis Reporting Only'); ?>
                     &nbsp;&nbsp;&nbsp;&nbsp;
-                    <input type='checkbox' title='<?php echo xlt("Only Show Service Code Finance Reporting Codes") ?>' name='search_financial_reporting' value='1'<?php if (!empty($search_financial_reporting)) {
+                    <input type='checkbox' title='<?php echo xla("Only Show Service Code Finance Reporting Codes") ?>' name='search_financial_reporting' value='1'<?php if (!empty($search_financial_reporting)) {
                         echo ' checked';
-} ?> />
+                                                  } ?> />
                     <?php echo xlt('Service Reporting Only'); ?>
                     <input type='hidden' name='fstart' value='<?php echo attr($fstart) ?>'>
                 </td>
 
                 <td class='text' align='right'>
                     <?php if ($fstart) { ?>
-                        <a href="javascript:submitList(<?php echo attr($pagesize) ?>)">
+                        <a href="javascript:submitList(<?php echo attr_js($pagesize); ?>)">
                             &lt;&lt;
                         </a>
                         &nbsp;&nbsp;
                     <?php } ?>
-                    <?php echo ($fstart + 1) . " - $fend of $count" ?>
+                    <?php echo text(($fstart + 1)) . " - " . text($fend) . " of  " . text($count); ?>
                     &nbsp;&nbsp;
-                    <a href="javascript:submitList(<?php echo attr($pagesize) ?>)">
+                    <a href="javascript:submitList(<?php echo attr_js($pagesize); ?>)">
                         &gt;&gt;
                     </a>
                 </td>
@@ -746,8 +752,7 @@ if ($fend > $count) {
         $res = main_code_set_search($filter_key, $search, null, null, false, null, false, $fstart, ($fend - $fstart), $filter_elements);
     }
 
-    for ($i = 0; $row = sqlFetchArray($res);
-    $i++) {
+    for ($i = 0; $row = sqlFetchArray($res); $i++) {
         $all[$i] = $row;
     }
 
@@ -815,10 +820,10 @@ if ($fend > $count) {
 
             if ($thisauthwrite) {
                 if ($iter["code_external"] > 0) {
-                    echo "  <td align='right'><a class='link' href='javascript:submitModify(\"" . attr($iter['code_type_name']) . "\",\"" . attr($iter['code']) . "\",\"" . attr($iter['id']) . "\")'>[" . xlt('Modify') . "]</a></td>\n";
+                    echo "  <td align='right'><a class='link' href='javascript:submitModify(" . attr_js($iter['code_type_name']) . "," . attr_js($iter['code']) . "," . attr_js($iter['id']) . ")'>[" . xlt('Modify') . "]</a></td>\n";
                 } else {
-                    echo "  <td align='right'><a class='link' href='javascript:submitDelete(" . attr($iter['id']) . ")'>[" . xlt('Delete') . "]</a></td>\n";
-                    echo "  <td align='right'><a class='link' href='javascript:submitEdit(" . attr($iter['id']) . ")'>[" . xlt('Edit') . "]</a></td>\n";
+                    echo "  <td align='right'><a class='link' href='javascript:submitDelete(" . attr_js($iter['id']) . ")'>[" . xlt('Delete') . "]</a></td>\n";
+                    echo "  <td align='right'><a class='link' href='javascript:submitEdit(" . attr_js($iter['id']) . ")'>[" . xlt('Edit') . "]</a></td>\n";
                 }
             }
 
@@ -835,7 +840,7 @@ if ($fend > $count) {
 <script language="JavaScript">
     <?php
     if ($alertmsg) {
-        echo "alert('" . addslashes($alertmsg) . "');\n";
+        echo "alert(" . js_escape($alertmsg) . ");\n";
     }
     ?>
 </script>

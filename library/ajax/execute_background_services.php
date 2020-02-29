@@ -37,14 +37,15 @@
  * Returns a count of due messages for current user.
  *
  * @package   OpenEMR
- * @link      http://www.open-emr.org
- * @author    EMR Direct <http://www.emrdirect.com/>
+ * @link      https://www.open-emr.org
+ * @author    EMR Direct <https://www.emrdirect.com/>
  * @author    Brady Miller <brady.g.miller@gmail.com>
- * @copyright Copyright (c) 2013 EMR Direct <http://www.emrdirect.com/>
+ * @copyright Copyright (c) 2013 EMR Direct <https://www.emrdirect.com/>
  * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 
 //ajax param should be set by calling ajax scripts
 $isAjaxCall = isset($_POST['ajax']);
@@ -69,8 +70,8 @@ if (!$isAjaxCall && (php_sapi_name() === 'cli')) {
     require_once(dirname(__FILE__) . "/../../interface/globals.php");
 
     // not calling from cron job so ensure passes csrf check
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 }
 

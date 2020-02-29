@@ -18,9 +18,11 @@
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
 
-include_once("../../globals.php");
-include_once("$srcdir/api.inc");
-include_once("$srcdir/forms.inc");
+require_once("../../globals.php");
+require_once("$srcdir/api.inc");
+require_once("$srcdir/forms.inc");
+
+use OpenEMR\Core\Header;
 
 $row = array();
 
@@ -36,7 +38,7 @@ function cbvalue($cbname)
 function cbinput($name, $colname)
 {
     global $row;
-    $ret  = "<input type='checkbox' name='$name' value='1'";
+    $ret  = "<input type='checkbox' name='" . attr($name) . "' value='1'";
     if ($row[$colname]) {
         $ret .= " checked";
     }
@@ -61,25 +63,18 @@ if ($_POST['bn_save']) {
  // If updating an existing form...
  //
     if ($formid) {
-        $query = "UPDATE form_specialist_notes SET " .
-         "notes = '"            . $_POST['form_notes']       . "', " .
-         "followup_required = " . cbvalue('fu_required')     . ", "  .
-         "followup_timing = '$fu_timing'"                    . ", "  .
-         "followup_location = '$fu_location'"                . " "   .
-         "WHERE id = '$formid'";
-        sqlStatement($query);
-    } // If adding a new form...
- //
-    else {
+        $query = "UPDATE form_specialist_notes SET
+         notes = ?,
+         followup_required = ?,
+         followup_timing = ?,
+         followup_location = ?,
+         WHERE id = ?";
+        sqlStatement($query, array($_POST['form_notes'] , cbvalue('fu_required'), $fu_timing, $fu_location, $formid ));
+    } else { // If adding a new form...
         $query = "INSERT INTO form_specialist_notes ( " .
          "notes, followup_required, followup_timing, followup_location " .
-         ") VALUES ( " .
-         "'" . $_POST['form_notes']       . "', " .
-         cbvalue('fu_required')           . ", "  .
-         "'$fu_timing'"                   . ", "  .
-         "'$fu_location'"                 . " "   .
-         ")";
-        $newid = sqlInsert($query);
+         ") VALUES ( ?, ?, ?, ? )";
+        $newid = sqlInsert($query, array($_POST['form_notes'] , cbvalue('fu_required'), $fu_timing, $fu_location));
         addForm($encounter, "Specialist Notes", $newid, "specialist_notes", $pid, $userauthorized);
     }
 
@@ -91,17 +86,15 @@ if ($_POST['bn_save']) {
 
 if ($formid) {
     $row = sqlQuery("SELECT * FROM form_specialist_notes WHERE " .
-    "id = '$formid' AND activity = '1'") ;
+    "id = ? AND activity = '1'", array($formid)) ;
 }
 ?>
 <html>
 <head>
-<?php html_header_show();?>
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
-<script type="text/javascript" src="../../../library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
+    <?php Header::setupHeader(); ?>
 <script language='JavaScript'>
  function newEvt() {
-  dlgopen('../../main/calendar/add_edit_event.php?patientid=<?php echo $pid ?>',
+  dlgopen('../../main/calendar/add_edit_event.php?patientid=' + <?php echo js_url($pid); ?>,
    '_blank', 775, 500);
   return false;
  }
@@ -109,7 +102,7 @@ if ($formid) {
 </head>
 
 <body class="body_top">
-<form method="post" action="<?php echo $rootdir ?>/forms/specialist_notes/new.php?id=<?php echo $formid ?>" onsubmit="return top.restoreSession()">
+<form method="post" action="<?php echo $rootdir ?>/forms/specialist_notes/new.php?id=<?php echo attr_url($formid); ?>" onsubmit="return top.restoreSession()">
 
 <center>
 
@@ -123,7 +116,7 @@ if ($formid) {
  <tr>
   <td width='5%'  nowrap> Notes </td>
   <td width='95%' nowrap>
-   <textarea name='form_notes' rows='18' style='width:100%'><?php echo $row['notes'] ?></textarea>
+   <textarea name='form_notes' rows='18' style='width:100%'><?php echo text($row['notes']); ?></textarea>
   </td>
  </tr>
 
@@ -138,7 +131,7 @@ if ($formid) {
      <td width='49%' nowrap>
       <input type='text' name='fu_timing' size='10' style='width:100%'
        title='When to follow up'
-       value='<?php echo addslashes($row['followup_timing']) ?>' />
+       value='<?php echo attr($row['followup_timing']) ?>' />
      </td>
      <td width='1%' nowrap>
       &nbsp;at&nbsp;
@@ -146,7 +139,7 @@ if ($formid) {
      <td width='49%' nowrap>
       <input type='text' name='fu_location' size='10' style='width:100%'
        title='Where to follow up'
-       value='<?php echo addslashes($row['followup_location']) ?>' />
+       value='<?php echo attr($row['followup_location']) ?>' />
      </td>
     </tr>
    </table>

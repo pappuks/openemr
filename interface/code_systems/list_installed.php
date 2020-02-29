@@ -28,10 +28,11 @@
 
 
 require_once("../../interface/globals.php");
-require_once("$srcdir/acl.inc");
+
+use OpenEMR\Common\Acl\AclMain;
 
 // Control access
-if (!acl_check('admin', 'super')) {
+if (!AclMain::aclCheckCore('admin', 'super')) {
     echo xlt('Not Authorized');
     exit;
 }
@@ -45,25 +46,25 @@ for ($iter=0; $row=sqlFetchArray($rez); $iter++) {
 }
 
 if (empty($sqlReturn)) {
-?>
+    ?>
     <div class="stg"><?php echo xlt("Not installed"); ?></div>
-<?php
+    <?php
 } else {
     if ($sqlReturn[0]['name'] == 'SNOMED' && $sqlReturn[0]['revision_version'] == 'US Extension') {
         // If using the SNOMED US Extension package, then show the preceding SNOMED International Package information first
-?>
+        ?>
         <div class="atr"><?php echo xlt("Name") . ": " . text($sqlReturn[1]['name']); ?> </div>
         <div class="atr"><?php echo xlt("Revision") . ": " . text($sqlReturn[1]['revision_version']); ?> </div>
         <div class="atr"><?php echo xlt("Release Date") . ": " . text($sqlReturn[1]['revision_date']); ?> </div>
-        <br>
-<?php
+        <br />
+        <?php
     }
 
     // Always show the first item of query results
-?>
+    ?>
     <div class="atr"><?php echo xlt("Name") . ": " . text($sqlReturn[0]['name']); ?> </div>
     <div class="atr"><?php echo xlt("Revision") . ": " . text($sqlReturn[0]['revision_version']); ?> </div>
     <div class="atr"><?php echo xlt("Release Date") . ": " . text($sqlReturn[0]['revision_date']); ?> </div>
-<?php
+    <?php
 }
 ?>

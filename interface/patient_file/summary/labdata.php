@@ -1,55 +1,44 @@
 <?php
 /**
-* How to present clinical parameter.
-*
-* Copyright (C) 2014 Joe Slam <trackanything@produnis.de>
-*
-* LICENSE: This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-* You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>.
-*
-* @package OpenEMR
-* @author Joe Slam <trackanything@produnis.de>
-* @link http://www.open-emr.org
-* ---------------------------------------------------------------------------------
-*
-* this script needs $pid to run...
-*
-* if you copy this file to another place,
-* make sure you set $path_to_this_script
-* to the propper path...
-
-
-* Prepare your data:
-* this script expects propper 'result_code' entries
-* in table 'procedure_results'. If your data miss
-* 'result_code' entries, you won't see anything,
-* so make sure they are there.
-* [additionally, the script will also look for 'units',
-* 'range' and 'code_text'. If these data are not available,
-* the script will run anyway...]
-*
-* the script will list all available patient's 'result_codes'
-* from table 'procedure_results'. Check those you wish to view.
-* If you see nothing to select, then
-*    a) there is actually no lab data of this patient available
-*    b) the lab data are missing 'result_code'-entries in table 'procedure_results'
-*
-
-*/
-// Some initial api-inputs
+ * How to present clinical parameter.
+ *
+ *
+ * this script needs $pid to run...
+ *
+ * if you copy this file to another place,
+ * make sure you set $path_to_this_script
+ * to the proper path...
+ * Prepare your data:
+ * this script expects proper 'result_code' entries
+ * in table 'procedure_results'. If your data miss
+ * 'result_code' entries, you won't see anything,
+ * so make sure they are there.
+ * [additionally, the script will also look for 'units',
+ * 'range' and 'code_text'. If these data are not available,
+ * the script will run anyway...]
+ *
+ * the script will list all available patient's 'result_codes'
+ * from table 'procedure_results'. Check those you wish to view.
+ * If you see nothing to select, then
+ *    a) there is actually no lab data of this patient available
+ *    b) the lab data are missing 'result_code'-entries in table 'procedure_results'
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Joe Slam <trackanything@produnis.de>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2014 Joe Slam <trackanything@produnis.de>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
 
 require_once("../../globals.php");
 require_once("../../../library/options.inc.php");
-include_once($GLOBALS["srcdir"] . "/api.inc");
+require_once($GLOBALS["srcdir"] . "/api.inc");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 // Set the path to this script
 $path_to_this_script = $rootdir . "/patient_file/summary/labdata.php";
@@ -84,13 +73,11 @@ echo "<html><head>";
 
 <?php require $GLOBALS['srcdir'] . '/js/xl/dygraphs.js.php'; ?>
 
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
-<link rel="stylesheet" href="<?php echo $web_root; ?>/interface/themes/labdata.css" type="text/css">
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/modified/dygraphs-2-0-0/dygraph.css" type="text/css"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-1-3-2/jquery.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/modified/dygraphs-2-0-0/dygraph.js?v=<?php echo $v_js_includes; ?>"></script>
+<?php Header::setupHeader('dygraphs'); ?>
 
-<script type="text/javascript" language="JavaScript">
+<link rel="stylesheet" href="<?php echo $web_root; ?>/interface/themes/labdata.css" type="text/css">
+
+<script>
 function checkAll(bx) {
     for (var tbls=document.getElementsByTagName("table"), i=tbls.length; i--; )
       for (var bxs=tbls[i].getElementsByTagName("input"), j=bxs.length; j--; )
@@ -107,12 +94,12 @@ echo "<span class='text'>";
 // some patient data...
 $spell  = "SELECT * ";
 $spell .= "FROM patient_data ";
-$spell .= "WHERE id = ?";
+$spell .= "WHERE pid = ?";
 //---
 $myrow = sqlQuery($spell, array($pid));
-    $lastname = $myrow["lname"];
-    $firstname  = $myrow["fname"];
-    $DOB  = $myrow["DOB"];
+$lastname = $myrow["lname"];
+$firstname  = $myrow["fname"];
+$DOB  = $myrow["DOB"];
 
 
 
@@ -128,7 +115,7 @@ if ($printable) {
 
 echo "<div id='reports_list'>";
 if (!$printable) {
-    echo "<form method='post' action='" . $path_to_this_script . "' onsubmit='return top.restoreSession()'>";
+    echo "<form method='post' action='" . attr($path_to_this_script) . "' onsubmit='return top.restoreSession()'>";
     // What items are there for patient $pid?
     // -----------------------------------------------
     $value_list = array();
@@ -162,7 +149,7 @@ if (!$printable) {
         }
 
         echo " /> " . text($myrow['value_code']) . "<br />";
-        $value_list[$i][value_code] = $myrow['value_code'];
+        $value_list[$i]['value_code'] = $myrow['value_code'];
         $i++;
         $tab++;
         if ($tab == 10) {
@@ -185,21 +172,21 @@ if ($mode == 'list') {
     echo "checked='checked' ";
 }
 
-    echo " value='list'> " . xlt('List') . "<br>";
+    echo " value='list'> " . xlt('List') . "<br />";
 
     echo "<input type='radio' name='mode' ";
 if ($mode != 'list') {
     echo "checked='checked' ";
 }
 
-    echo " value='matrix'> " . xlt('Matrix') . "<br>";
+    echo " value='matrix'> " . xlt('Matrix') . "<br />";
 
     echo "<td></td></td>";
     echo "</tr><tr>";
     echo "<td>";
 
     echo "<a href='../summary/demographics.php' ";
-    echo " class='css_button' onclick='top.restoreSession()'>";
+    echo " class='btn btn-secondary' onclick='top.restoreSession()'>";
     echo "<span>" . xlt('Back to Patient') . "</span></a>";
 
     echo "</td>";
@@ -207,7 +194,7 @@ if ($mode != 'list') {
     echo "</tr></table>";
     echo "</form>";
 } // end "if printable"
-    echo "<br><br><hr><br>";
+    echo "<br /><br /><hr><br />";
 
 // print results of patient's items
 //-------------------------------------------
@@ -220,7 +207,7 @@ if ($value_select) {
         $i = 0;
         $item_graph = 0;
         $rowspan = count($value_select);
-        echo "<table border='1' cellspacing='3'>";
+        echo "<table class='border' cellspacing='3'>";
         echo "<tr>";
         #echo "<th class='list'>Item</td>";
         echo "<th class='list'>" . xlt('Name') . "</th> ";
@@ -275,7 +262,7 @@ if ($value_select) {
                 echo "<td class='list_log'>"  . text($myrow['review_status']) . "</td>";
                 echo "<td class='list_log'>";
                 if (!$printable) {
-                    echo "<a href='../../patient_file/encounter/encounter_top.php?set_encounter=". attr($myrow['encounter_id']) . "' target='RBot'>";
+                    echo "<a href='../../patient_file/encounter/encounter_top.php?set_encounter=". attr_url($myrow['encounter_id']) . "' target='RBot'>";
                     echo text($myrow['encounter_id']);
                     echo "</a>";
                 } else {
@@ -289,19 +276,19 @@ if ($value_select) {
 
             if ($value_count > 1 && !$printable) {
                 echo "<tr><td colspan='7' align='center'>";
-                echo "<input type='button' class='graph_button'  onclick='get_my_graph" . attr($item_graph) . "()' name='' value='" . xla('Plot item') . " \"" . attr($the_item) . "\"'>";
+                echo "<input type='button' class='graph_button btn btn-secondary' onclick='get_my_graph" . attr($item_graph) . "()' name='' value='" . xla('Plot item') . " \"" . attr($the_item) . "\"'>";
                 echo "</td></tr>";
             }
             ?>
-            <script type="text/javascript">
+            <script>
             // prepare to plot the stuff
             top.restoreSession();
             function get_my_graph<?php echo attr($item_graph) ?>(){
-                var thedates = JSON.stringify(<?php echo json_encode($date_array); ?>);
-                var thevalues =  JSON.stringify(<?php echo json_encode($value_array); ?>);
-                var theitem = JSON.stringify(<?php echo json_encode(array($the_item)); ?>);
-                var thetitle = JSON.stringify(<?php echo json_encode($the_item); ?>);
-                var checkboxfake = JSON.stringify(<?php echo json_encode(array(0)); ?>);
+                var thedates = JSON.stringify(<?php echo js_escape($date_array); ?>);
+                var thevalues =  JSON.stringify(<?php echo js_escape($value_array); ?>);
+                var theitem = JSON.stringify(<?php echo js_escape(array($the_item)); ?>);
+                var thetitle = JSON.stringify(<?php echo js_escape($the_item); ?>);
+                var checkboxfake = JSON.stringify(<?php echo js_escape(array(0)); ?>);
 
                 $.ajax({ url: '<?php echo $web_root; ?>/library/ajax/graph_track_anything.php',
                         type: 'POST',
@@ -309,12 +296,13 @@ if ($value_select) {
                                 values: thevalues,
                                 track:  thetitle,
                                 items:  theitem,
-                                thecheckboxes: checkboxfake
+                                thecheckboxes: checkboxfake,
+                                csrf_token_form: <?php echo js_escape(CsrfUtils::collectCsrfToken()); ?>
                             },
                         dataType: "json",
                         success: function(returnData){
                             g2 = new Dygraph(
-                                document.getElementById("graph_item_<?php echo $item_graph ?>"),
+                                document.getElementById(<?php echo js_escape('graph_item_'.$item_graph) ?>),
                                 returnData.data_final,
                                 {
                                     title: returnData.title,
@@ -337,7 +325,7 @@ if ($value_select) {
             $item_graph++;
         }
 
-        echo "</table><br>";
+        echo "</table><br />";
     }// end if mode = list
 
     //##########################################################################################################################
@@ -355,7 +343,7 @@ if ($value_select) {
                 $value_matrix[$i][result_code]          = $myrow['result_code'];
                 $value_matrix[$i][result_text]          = $myrow['result_text'];
                 $value_matrix[$i][result]               = $myrow['result'];
-                // $value_matrix[$i][units] 				= generate_display_field(array('data_type'=>'1','list_id'=>'proc_unit'),$myrow['units']) ;
+                // $value_matrix[$i][units]                 = generate_display_field(array('data_type'=>'1','list_id'=>'proc_unit'),$myrow['units']) ;
                 $value_matrix[$i][units]                = $myrow['units'];
                 $value_matrix[$i][range]                = $myrow['range'];
                 $value_matrix[$i][abnormal]             = $myrow['abnormal'];
@@ -385,7 +373,7 @@ if ($value_select) {
         $itemcount = count($value_matrix);
 
         // print matrix
-        echo "<table border='1' cellpadding='2'>";
+        echo "<table class='border' cellpadding='2'>";
         echo "<tr>";
         #echo "<th class='matrix'>Item</th>";
         echo "<th class='matrix'>" . xlt('Name') . "</th>";
@@ -402,7 +390,7 @@ if ($value_select) {
         $a=true;
         while ($a==true) {
             echo "<tr>";
-            #echo "<td class='matrix_item'>" . $value_matrix[$i]['result_code'] . "</td>";
+            #echo "<td class='matrix_item'>" . text($value_matrix[$i]['result_code']) . "</td>";
             echo "<td class='matrix_item'>" . text($value_matrix[$i]['result_text']) . "</td>";
             echo "<td class='matrix_item'>" . text($value_matrix[$i]['range']) . "</td>";
             echo "<td class='matrix_item'>" . text($value_matrix[$i]['units']) . "</td>";
@@ -457,7 +445,7 @@ if ($value_select) {
 if (!$printable) {
     if (!$nothing) {
         echo "<p>";
-        echo "<form method='post' action='" . $path_to_this_script . "' target='_new' onsubmit='return top.restoreSession()'>";
+        echo "<form method='post' action='" . attr($path_to_this_script) . "' target='_new' onsubmit='return top.restoreSession()'>";
         echo "<input type='hidden' name='mode' value='". attr($mode) . "'>";
         foreach ($_POST['value_code'] as $this_valuecode) {
             echo "<input type='hidden' name='value_code[]' value='". attr($this_valuecode) . "'>";
@@ -465,8 +453,8 @@ if (!$printable) {
 
         echo "<input type='submit' name='print' value='" . xla('View Printable Version') . "' />";
         echo "</form>";
-        echo "<br><a href='../summary/demographics.php' ";
-        echo " class='css_button' onclick='top.restoreSession()'>";
+        echo "<br /><a href='../summary/demographics.php' ";
+        echo " class='btn btn-secondary' onclick='top.restoreSession()'>";
         echo "<span>" . xlt('Back to Patient') . "</span></a>";
     }
 } else {
@@ -474,7 +462,7 @@ if (!$printable) {
 }
 
 echo "</span>";
-echo "<br><br>";
+echo "<br /><br />";
 echo "</div>";
 echo "</body></html>";
 ?>

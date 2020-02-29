@@ -6,7 +6,9 @@
  * @package   OpenEMR
  * @link      http://www.open-emr.org
  * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2015-2017 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
@@ -15,6 +17,7 @@ require_once($GLOBALS['srcdir'] . '/patient.inc');
 require_once($GLOBALS['srcdir'] . '/csv_like_join.php');
 require_once($GLOBALS['fileroot'] . '/custom/code_types.inc.php');
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
 $info_msg = "";
@@ -55,14 +58,14 @@ var oTable;
 // Keeps track of which items have been selected during this session.
 var oChosenIDs = {};
 
-$(document).ready(function() {
+$(function() {
 
  // Initializing the DataTable.
  oTable = $('#my_data_table').dataTable({
   "bProcessing": true,
   // Next 2 lines invoke server side processing
   "bServerSide": true,
-  "sAjaxSource": "find_code_dynamic_ajax.php",
+  "sAjaxSource": "find_code_dynamic_ajax.php?csrf_token_form=" + <?php echo js_url(CsrfUtils::collectCsrfToken()); ?>,
   // Vertical length options and their default
   "aLengthMenu": [ 15, 25, 50, 100 ],
   "iDisplayLength": 15,
@@ -70,14 +73,14 @@ $(document).ready(function() {
   "aoColumns": [{"sWidth":"10%"}, null],
   // This callback function passes some form data on each call to the ajax handler.
   "fnServerParams": function (aoData) {
-    aoData.push({"name": "what", "value": "<?php echo attr($what); ?>"});
+    aoData.push({"name": "what", "value": <?php echo js_escape($what); ?>});
 <?php if ($what == 'codes') { ?>
     aoData.push({"name": "codetype", "value": document.forms[0].form_code_type.value});
     aoData.push({"name": "inactive", "value": (document.forms[0].form_include_inactive.checked ? 1 : 0)});
 <?php } else if ($what == 'fields') { ?>
-    aoData.push({"name": "source", "value": "<?php echo attr($source); ?>"});
+    aoData.push({"name": "source", "value": <?php echo js_escape($source); ?>});
 <?php } else if ($what == 'groups') { ?>
-    aoData.push({"name": "layout_id", "value": "<?php echo attr($layout_id); ?>"});
+    aoData.push({"name": "layout_id", "value": <?php echo js_escape($layout_id); ?>});
 <?php } ?>
   },
   // Drawing a row, apply styling if it is previously selected.
@@ -88,17 +91,17 @@ $(document).ready(function() {
   },
   // Language strings are included so we can translate them
   "oLanguage": {
-   "sSearch"      : "<?php echo xla('Search for'); ?>:",
-   "sLengthMenu"  : "<?php echo xla('Show') . ' _MENU_ ' . xla('entries'); ?>",
-   "sZeroRecords" : "<?php echo xla('No matching records found'); ?>",
-   "sInfo"        : "<?php echo xla('Showing') . ' _START_ ' . xla('to{{range}}') . ' _END_ ' . xla('of') . ' _TOTAL_ ' . xla('entries'); ?>",
-   "sInfoEmpty"   : "<?php echo xla('Nothing to show'); ?>",
-   "sInfoFiltered": "(<?php echo xla('filtered from') . ' _MAX_ ' . xla('total entries'); ?>)",
+   "sSearch"      : <?php echo xlj('Search for'); ?> + ":",
+   "sLengthMenu"  : <?php echo xlj('Show'); ?> + " _MENU_ " + <?php echo xlj('entries'); ?>,
+   "sZeroRecords" : <?php echo xlj('No matching records found'); ?>,
+   "sInfo"        : <?php echo xlj('Showing'); ?> + " _START_ " + <?php echo xlj('to{{range}}'); ?> + " _END_ " + <?php echo xlj('of'); ?> + " _TOTAL_ " + <?php echo xlj('entries'); ?>,
+   "sInfoEmpty"   : <?php echo xlj('Nothing to show'); ?>,
+   "sInfoFiltered": "(" + <?php echo xlj('filtered from'); ?> + " _MAX_ " + <?php echo xlj('total entries'); ?> + ")",
    "oPaginate"    : {
-    "sFirst"      : "<?php echo xla('First'); ?>",
-    "sPrevious"   : "<?php echo xla('Previous'); ?>",
-    "sNext"       : "<?php echo xla('Next'); ?>",
-    "sLast"       : "<?php echo xla('Last'); ?>"
+    "sFirst"      : <?php echo xlj('First'); ?>,
+    "sPrevious"   : <?php echo xlj('Previous'); ?>,
+    "sNext"       : <?php echo xlj('Next'); ?>,
+    "sLast"       : <?php echo xlj('Last'); ?>
    }
   }
  });
@@ -143,11 +146,10 @@ $(document).ready(function() {
 });
 
 <?php if ($what == 'codes') { ?>
-
 // Pass info back to the opener and close this window. Specific to billing/product codes.
 function selcode(codetype, code, selector, codedesc) {
  if (opener.closed || ! opener.set_related) {
-  alert('<?php echo xls('The destination form was closed; I cannot act on your selection.'); ?>');
+  alert(<?php echo xlj('The destination form was closed; I cannot act on your selection.'); ?>);
  }
  else {
   var msg = opener.set_related(codetype, code, selector, codedesc);
@@ -159,7 +161,7 @@ function selcode(codetype, code, selector, codedesc) {
 // Function to call the opener to delete all or one related code. Specific to billing/product codes.
 function delcode() {
  if (opener.closed || ! opener.del_related) {
-  alert('<?php echo xls('The destination form was closed; I cannot act on your selection.'); ?>');
+  alert(<?php echo xlj('The destination form was closed; I cannot act on your selection.'); ?>);
  }
  else {
   var sel = document.forms[0].form_delcodes;
@@ -172,7 +174,6 @@ function delcode() {
 }
 
 <?php } else if ($what == 'fields') { ?>
-
 function selectField(jobj) {
   if (opener.closed || ! opener.SetField) {
     alert('The destination form was closed; I cannot act on your selection.');
@@ -203,7 +204,6 @@ function newField() {
 }
 
 <?php } else if ($what == 'lists') { ?>
-
 function SelectList(jobj) {
   if (opener.closed || ! opener.SetList)
     alert('The destination form was closed; I cannot act on your selection.');
@@ -214,7 +214,6 @@ function SelectList(jobj) {
 };
 
 <?php } else if ($what == 'groups') { ?>
-
 var SelectItem = function(jobj) {
   if (opener.closed)
     alert('The destination form was closed; I cannot act on your selection.');
@@ -233,11 +232,10 @@ var SelectItem = function(jobj) {
 <body id="codes_search" class="body_top">
 
 <?php
-$string_target_element = empty($target_element) ? '?' : "?target_element=" . rawurlencode($target_element) . "&";
+$string_target_element = empty($target_element) ? '?' : "?target_element=" . attr_url($target_element) . "&";
 ?>
 
 <form method='post' name='theform'>
-
 <?php
 echo "<p>\n";
 if ($what == 'codes') {

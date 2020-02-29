@@ -17,20 +17,21 @@
  *
  * @package OpenEMR
  * @author  Visolve <services@visolve.com>
- * @link    http://www.open-emr.org
+ * @link    https://www.open-emr.org
  */
 
 
 require_once("../interface/globals.php");
-require_once("$srcdir/log.inc");
-require_once("$srcdir/acl.inc");
 
-if (!acl_check('admin', 'users')) {
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+
+if (!AclMain::aclCheckCore('admin', 'users')) {
     die(xlt("Not Authorized"));
 }
 
-if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-    csrfNotVerified();
+if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
 }
 
 $valid  = true;
@@ -62,6 +63,6 @@ function catch_logs()
 {
     $sql = sqlStatement("select * from log where id not in(select log_id from log_validator) and checksum is NOT null and checksum != ''");
     while ($row = sqlFetchArray($sql)) {
-        sqlInsert("INSERT into log_validator (log_id,log_checksum) VALUES(?,?)", array($row['id'],$row['checksum']));
+        sqlStatement("INSERT into log_validator (log_id,log_checksum) VALUES(?,?)", array($row['id'],$row['checksum']));
     }
 }

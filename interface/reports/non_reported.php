@@ -13,7 +13,7 @@
  * @copyright Copyright (c) 2008 Rod Roark <rod@sunsetsystems.com>
  * @copyright Copyright (c) 2010 Tomasz Wyderka <wyderkat@cofoh.com>
  * @copyright Copyright (c) 2015 Ensoftek <rammohan@ensoftek.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
@@ -22,7 +22,14 @@ require_once("../globals.php");
 require_once("$srcdir/patient.inc");
 require_once("../../custom/code_types.inc.php");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
+
+if (!empty($_POST)) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+}
 
 // Ensoftek: Jul-2015: Get the facility of the logged in user.
 function getLoggedInUserFacility()
@@ -278,11 +285,11 @@ if ($_POST['form_get_hl7']==='true') {
 
     <?php Header::setupHeader('datetime-picker'); ?>
 
-    <script language="JavaScript">
+    <script>
 
         <?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
 
-        $(document).ready(function() {
+        $(function() {
             var win = top.printLogSetup ? top : opener.top;
             win.printLogSetup(document.getElementById('printbutton'));
 
@@ -297,7 +304,7 @@ if ($_POST['form_get_hl7']==='true') {
 
     </script>
 
-    <style type="text/css">
+    <style>
     /* specifically include & exclude from printing */
     @media print {
         #report_parameters {
@@ -331,11 +338,11 @@ if ($_POST['form_get_hl7']==='true') {
 <span class='title'><?php echo xlt('Report'); ?> - <?php echo xlt('Syndromic Surveillance - Non Reported Issues'); ?></span>
 
 <div id="report_parameters_daterange">
-<?php echo text(oeFormatShortDate($from_date)) ." &nbsp; " . xlt('to')  . "&nbsp; ". text(oeFormatShortDate($to_date)); ?>
+<?php echo text(oeFormatShortDate($from_date)) ." &nbsp; " . xlt('to{{Range}}')  . "&nbsp; ". text(oeFormatShortDate($to_date)); ?>
 </div>
 
-<form name='theform' id='theform' method='post' action='non_reported.php'
-onsubmit='return top.restoreSession()'>
+<form name='theform' id='theform' method='post' action='non_reported.php' onsubmit='return top.restoreSession()'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 <div id="report_parameters">
 <input type='hidden' name='form_refresh' id='form_refresh' value=''/>
 <input type='hidden' name='form_get_hl7' id='form_get_hl7' value=''/>
@@ -345,7 +352,7 @@ onsubmit='return top.restoreSession()'>
     <div style='float:left'>
       <table class='text'>
         <tr>
-          <td class='control-label'>
+          <td class='col-form-label'>
             <?php echo xlt('Diagnosis'); ?>:
           </td>
           <td>
@@ -375,7 +382,7 @@ while ($crow = sqlFetchArray($cres)) {
  echo "   </select>\n";
 ?>
           </td>
-          <td class='control-label'>
+          <td class='col-form-label'>
             <?php echo xlt('From'); ?>:
           </td>
           <td>
@@ -383,8 +390,8 @@ while ($crow = sqlFetchArray($cres)) {
             class='datepicker form-control'
             size='10' value='<?php echo attr(oeFormatShortDate($from_date)); ?>'>
           </td>
-          <td class='control-label'>
-            <?php xl('To', 'e'); ?>:
+          <td class='col-form-label'>
+            <?php echo xlt('To{{Range}}'); ?>:
           </td>
           <td>
             <input type='text' name='form_to_date' id="form_to_date"
@@ -395,13 +402,13 @@ while ($crow = sqlFetchArray($cres)) {
       </table>
     </div>
   </td>
-  <td align='left' valign='middle' height="100%">
-    <table style='border-left:1px solid; width:100%; height:100%' >
+  <td class='h-100' align='left' valign='middle'>
+    <table class='w-100 h-100' style='border-left:1px solid;'>
       <tr>
         <td>
           <div class="text-center">
             <div class="btn-group" role="group">
-              <a href='#' class='btn btn-default btn-refresh'
+              <a href='#' class='btn btn-secondary btn-refresh'
                 onclick='
                   $("#form_refresh").attr("value","true");
                   $("#form_get_hl7").attr("value","false");
@@ -410,11 +417,11 @@ while ($crow = sqlFetchArray($cres)) {
                 <?php echo xlt('Refresh'); ?>
               </a>
                 <?php if ($_POST['form_refresh']) { ?>
-                <a href='#' class='btn btn-default btn-print' id='printbutton'>
+                <a href='#' class='btn btn-secondary btn-print' id='printbutton'>
                     <?php echo xlt('Print'); ?>
                 </a>
-                <a href='#' class='btn btn-default btn-transmit' onclick=
-                  "if(confirm('<?php echo xls('This step will generate a file which you have to save for future use. The file cannot be generated again. Do you want to proceed?'); ?>')) {
+                <a href='#' class='btn btn-secondary btn-transmit' onclick=
+                  "if(confirm(<?php echo xlj('This step will generate a file which you have to save for future use. The file cannot be generated again. Do you want to proceed?'); ?>)) {
                     $('#form_get_hl7').attr('value','true');
                     $('#theform').submit();
                   }">
@@ -434,10 +441,10 @@ while ($crow = sqlFetchArray($cres)) {
 
 <?php
 if ($_POST['form_refresh']) {
-?>
+    ?>
 <div id="report_results">
-<table>
-<thead align="left">
+<table class='table'>
+<thead class='thead-light' align="left">
 <th> <?php echo xlt('Patient ID'); ?> </th>
 <th> <?php echo xlt('Patient Name'); ?> </th>
 <th> <?php echo xlt('Diagnosis'); ?> </th>
@@ -446,38 +453,38 @@ if ($_POST['form_refresh']) {
 <th> <?php echo xlt('Issue Date'); ?> </th>
 </thead>
 <tbody>
-<?php
-$total = 0;
+    <?php
+    $total = 0;
 //echo "<p> DEBUG query: $query </p>\n"; // debugging
-$res = sqlStatement($query, $sqlBindArray);
+    $res = sqlStatement($query, $sqlBindArray);
 
 
-while ($row = sqlFetchArray($res)) {
-?>
+    while ($row = sqlFetchArray($res)) {
+        ?>
 <tr>
 <td>
-<?php echo text($row['patientid']) ?>
+        <?php echo text($row['patientid']) ?>
 </td>
 <td>
-<?php echo text($row['patientname']) ?>
+        <?php echo text($row['patientname']) ?>
 </td>
 <td>
-<?php echo text($row['diagnosis']) ?>
+        <?php echo text($row['diagnosis']) ?>
 </td>
 <td>
-<?php echo text($row['issueid']) ?>
+        <?php echo text($row['issueid']) ?>
 </td>
 <td>
-<?php echo text($row['issuetitle']) ?>
+        <?php echo text($row['issuetitle']) ?>
 </td>
 <td>
-<?php echo text($row['issuedate']) ?>
+        <?php echo text($row['issuedate']) ?>
 </td>
 </tr>
-<?php
-++$total;
-}
-?>
+        <?php
+        ++$total;
+    }
+    ?>
 <tr class="report_totals">
  <td colspan='9'>
     <?php echo xlt('Total Number of Issues'); ?>
@@ -491,7 +498,7 @@ while ($row = sqlFetchArray($res)) {
 </div> <!-- end of results -->
 <?php } else { ?>
 <div class='text'>
-    <?php echo xlt('Click Refresh to view all results, or please input search criteria above to view specific results.'); ?><br>
+    <?php echo xlt('Click Refresh to view all results, or please input search criteria above to view specific results.'); ?><br />
   (<?php echo xlt('This report currently only works for ICD9 codes.'); ?>)
 </div>
 <?php } ?>

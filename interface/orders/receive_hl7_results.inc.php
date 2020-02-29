@@ -23,6 +23,8 @@
 
 require_once("$srcdir/forms.inc");
 
+use OpenEMR\Common\Logging\EventAuditLogger;
+
 $rhl7_return = array();
 
 function rhl7LogMsg($msg, $fatal = true)
@@ -31,7 +33,7 @@ function rhl7LogMsg($msg, $fatal = true)
     if ($fatal) {
         $rhl7_return['mssgs'][] = '*' . $msg;
         $rhl7_return['fatal'] = true;
-        newEvent("lab-results-error", $_SESSION['authUser'], $_SESSION['authProvider'], 0, $msg);
+        EventAuditLogger::instance()->newEvent("lab-results-error", $_SESSION['authUser'], $_SESSION['authProvider'], 0, $msg);
     } else {
         $rhl7_return['mssgs'][] = '>' . $msg;
     }
@@ -67,20 +69,22 @@ function rhl7FlushMain(&$amain, $commentdelim = "\n")
 {
     foreach ($amain as $arr) {
         $procedure_report_id = rhl7InsertRow($arr['rep'], 'procedure_report');
-        foreach ($arr['res'] as $ares) {
-            $ares['procedure_report_id'] = $procedure_report_id;
-            // obxkey was used to identify parent results but is not stored.
-            unset($ares['obxkey']);
-            // If TX result is not over 10 characters, move it from comments to result field.
-            if ($ares['result'] === '' && $ares['result_data_type'] == 'L') {
-                $i = strpos($ares['comments'], $commentdelim);
-                if ($i && $i <= 10) {
-                    $ares['result'  ] = substr($ares['comments'], 0, $i);
-                    $ares['comments'] = substr($ares['comments'], $i);
+        if (!empty($arr['res'])) {
+            foreach ($arr['res'] as $ares) {
+                $ares['procedure_report_id'] = $procedure_report_id;
+                // obxkey was used to identify parent results but is not stored.
+                unset($ares['obxkey']);
+                // If TX result is not over 10 characters, move it from comments to result field.
+                if ($ares['result'] === '' && $ares['result_data_type'] == 'L') {
+                    $i = strpos($ares['comments'], $commentdelim);
+                    if ($i && $i <= 10) {
+                        $ares['result'] = substr($ares['comments'], 0, $i);
+                        $ares['comments'] = substr($ares['comments'], $i);
+                    }
                 }
-            }
 
-            rhl7InsertRow($ares, 'procedure_result');
+                rhl7InsertRow($ares, 'procedure_result');
+            }
         }
     }
 }
@@ -931,7 +935,7 @@ function receive_hl7_results(&$hl7, &$matchreq, $lab_id = 0, $direction = 'B', $
                 if (!$dryrun) {
                     sqlBeginTrans();
                     $procedure_order_seq = sqlQuery("SELECT IFNULL(MAX(procedure_order_seq),0) + 1 AS increment FROM procedure_order_code WHERE procedure_order_id = ? ", array($in_orderid));
-                    sqlInsert(
+                    sqlStatement(
                         "INSERT INTO procedure_order_code SET " .
                         "procedure_order_id = ?, " .
                         "procedure_order_seq = ?, " .
@@ -1130,15 +1134,22 @@ function receive_hl7_results(&$hl7, &$matchreq, $lab_id = 0, $direction = 'B', $
             $alast = count($amain) - 1;
             $rlast = count($amain[$alast]['res']) - 1;
             $amain[$alast]['res'][$rlast]['comments'] .= rhl7Text($a[3], true) . $commentdelim;
-        } // Ensoftek: Get data from SPM segment for specimen.
-        // SPM segment always occurs after the OBX segment.
-        else if ('SPM' == $a[0] && 'ORU' == $msgtype) {
+        } else if ('SPM' == $a[0] && 'ORU' == $msgtype) { // Ensoftek: Get data from SPM segment for specimen.
+            // SPM segment always occurs after the OBX segment.
             rhl7UpdateReportWithSpecimen($amain, $a, $d2);
-        } // Add code here for any other segment types that may be present.
-
-        // Ensoftek: Get data from SPM segment for specimen. Comes in with MU2 samples, but can be ignored.
-        else if ('TQ1' == $a[0] && 'ORU' == $msgtype) {
+        } else if ('TQ1' == $a[0] && 'ORU' == $msgtype) { // Add code here for any other segment types that may be present.
+            // Ensoftek: Get data from SPM segment for specimen. Comes in with MU2 samples, but can be ignored.
             // Ignore and do nothing.
+        } else if ('NTE' == $a[0] && 'PID' == $context) {
+            // will get orderid on save.
+            $amain[0]['rep']['report_notes'] .= rhl7Text($a[3], true) . "\n";
+        } else if ('ZPS' == $a[0] && 'ORU' == $msgtype) {
+            //global $ares;
+            $performingOrganization = parseZPS($a);
+            if (!empty($performingOrganization)) {
+                $alast = count($amain) - 1;
+                $amain[$alast]['res'][0]['facility'] .= $performingOrganization . $commentdelim;
+            }
         } else {
             return rhl7LogMsg(xl('Segment name') . " '${a[0]}' " . xl('is misplaced or unknown'));
         }
@@ -1241,7 +1252,7 @@ function poll_hl7_results(&$info)
                 }
 
                 // Ensure that archive directory exists.
-                $prpath = $GLOBALS['OE_SITE_DIR'] . "/procedure_results";
+                $prpath = $GLOBALS['OE_SITE_DIR'] . "/documents/procedure_results";
                 if (!file_exists($prpath)) {
                     mkdir($prpath);
                 }
@@ -1298,9 +1309,7 @@ function poll_hl7_results(&$info)
                     }
                 }
             } // end of this file
-        } // end SFTP
-
-        else if ($protocol == 'FS') {
+        } else if ($protocol == 'FS') { // end SFTP
             // Filesystem directory containing results files.
             $pathname = $pprow['results_path'];
             if (!($dh = opendir($pathname))) {
@@ -1327,7 +1336,7 @@ function poll_hl7_results(&$info)
                 }
 
                 // Ensure that archive directory exists.
-                $prpath = $GLOBALS['OE_SITE_DIR'] . "/procedure_results";
+                $prpath = $GLOBALS['OE_SITE_DIR'] . "/documents/procedure_results";
                 if (!file_exists($prpath)) {
                     mkdir($prpath);
                 }

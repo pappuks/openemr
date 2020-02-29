@@ -2,22 +2,11 @@
 /**
  * knockoutjs template for rendering the interface for justifying procedures
  *
- * Copyright (C) 2013 Kevin Yeh <kevin.y@integralemr.com> and OEMR <www.oemr.org>
- *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
- * @package OpenEMR
- * @author  Kevin Yeh <kevin.y@integralemr.com>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Kevin Yeh <kevin.y@integralemr.com>
+ * @copyright Copyright (c) 2013 Kevin Yeh <kevin.y@integralemr.com> and OEMR <www.oemr.org>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 ?>
 <script type="text/html" id="justify-display">
@@ -33,7 +22,7 @@
         </div>
         <span>
             <span data-bind="visible: diag_code_types.length>0">
-                <input value= type="text" data-bind="value: search_query, valueUpdate: 'afterkeydown', event:{focus:search_focus, blur: search_blur, keydown:search_key}, hasfocus: search_has_focus"/>
+                <input value= type="text" class="form-control" data-bind="value: search_query, valueUpdate: 'afterkeydown', event:{focus:search_focus, blur: search_blur, keydown:search_key}, hasfocus: search_has_focus" />
                 <span class="search_results" data-bind="visible: (search_results().length>0) && search_show">
                     <table>
                         <tbody data-bind="foreach: $data.search_results">
@@ -43,11 +32,11 @@
                             </tr>
                         </tbody>
                     </table>
-                </span> 
-                <select data-bind="value: searchType, options: diag_code_types, optionsText: 'key'"></select>
+                </span>
+                <select class="form-control" data-bind="value: searchType, options: diag_code_types, optionsText: 'key'"></select>
             </span>
         </span>
-        <table class="table table-condensed">
+        <table class="table table-sm">
             <thead>
                 <tr>
                     <th class='sort' data-bind="event: {click: sort_justify}" title="<?php echo xla('Click to sort') ?>">#</th>
@@ -63,14 +52,14 @@
                     <td class="info" data-bind="text: code, attr:{title:code_type}"></td>
                     <td class="info">
                         <span title="<?php echo xla('Click to edit description'); ?>" data-bind="text: description, visible: !edit_mode(), event: {click: start_edit}"></span>
-                        <input class="description" type="text" data-bind="valueUpdate: 'afterkeydown',value: description, visible: edit_mode(), event: {blur: end_edit, keydown:edit_key},hasfocus: edit_mode()"/>
+                        <input class="description form-control" type="text" data-bind="valueUpdate: 'afterkeydown',value: description, visible: edit_mode(), event: {blur: end_edit, keydown:edit_key},hasfocus: edit_mode()"/>
                     </td>
                 </tr>
             </tbody>
         </table>
-        <div>
-            <input type="button" data-bind="click: update_justify" value="<?php echo xlt("Update");?>"/>
-            <input class="cancel_dialog" type="button" data-bind="click: cancel_justify" value="<?php echo xla("Cancel");?>"/>
+        <div class="btn-group">
+            <input type="button" class="btn btn-primary" data-bind="click: update_justify" value="<?php echo xlt("Update");?>"/>
+            <input class="cancel_dialog btn btn-primary" type="button" data-bind="click: cancel_justify" value="<?php echo xla("Cancel");?>"/>
         </div>
     </div>
 </script>

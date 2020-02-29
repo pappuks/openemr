@@ -31,7 +31,7 @@
 exit;
 
 if (!$_POST['submit']) {
-?>
+    ?>
 <form method=post>
 <p>
 This script will take the name that you give and create an OpenEMR database with this as the database name, username, password, group name.  It will also rename the directory this OpenEMR installation is under to the new name.  THIS ONLY WORKS WITH XAMPP AND HAS VERY LIMITED TESTING.
@@ -45,8 +45,8 @@ Enter the name you wish to use for this OpenEMR installation.
 <input type=text name=newname>
 <input type=submit name=submit value=submit>
 </form>
-<?php
-exit(0);
+    <?php
+    exit(0);
 }
 
 if ($_POST['submit']) {
@@ -77,9 +77,9 @@ if ($_POST['submit']) {
     if ($dbh == false) {
         echo "ERROR.  Check your login credentials.\n";
         echo "<p>".mysql_error()." (#".mysql_errno().")\n";
-        break;
+        exit;
     } else {
-        echo "OK.<br>\n";
+        echo "OK.<br />\n";
     }
 
     echo "Creating database...\n";
@@ -87,9 +87,9 @@ if ($_POST['submit']) {
     if (mysql_query("create database $dbname", $dbh) == false) {
         echo "ERROR.  Check your login credentials.\n";
         echo "<p>".mysql_error()." (#".mysql_errno().")\n";
-        break;
+        exit;
     } else {
-        echo "OK.<br>\n";
+        echo "OK.<br />\n";
     }
 
     echo "Creating user with permissions for database...\n";
@@ -98,9 +98,9 @@ if ($_POST['submit']) {
         echo "ERROR when granting privileges to the specified user.\n";
         echo "<p>".mysql_error()." (#".mysql_errno().")\n";
         echo "ERROR.\n";
-        break;
+        exit;
     } else {
-        echo "OK.<br>\n";
+        echo "OK.<br />\n";
     }
 
     echo "Reconnecting as new user...\n";
@@ -118,9 +118,9 @@ if ($server == "localhost") {
 if ($dbh == false) {
     echo "ERROR.  Check your login credentials.\n";
     echo "<p>".mysql_error()." (#".mysql_errno().")\n";
-    break;
+    exit;
 } else {
-    echo "OK.<br>\n";
+    echo "OK.<br />\n";
 }
 
 echo "Opening database...";
@@ -128,9 +128,9 @@ flush();
 if (mysql_select_db("$dbname", $dbh) == false) {
     echo "ERROR.  Check your login credentials.\n";
     echo "<p>".mysql_error()." (#".mysql_errno().")\n";
-    break;
+    exit;
 } else {
-    echo "OK.<br>\n";
+    echo "OK.<br />\n";
 }
 
     flush();
@@ -142,7 +142,7 @@ if ($upgrade != 1) {
     if ($fd == false) {
         echo "ERROR.  Could not open dumpfile '$dumpfile'.\n";
         flush();
-        break;
+        exit;
     }
 
     $query = "";
@@ -171,7 +171,7 @@ if ($upgrade != 1) {
         }
     }
 
-    echo "OK<br>\n";
+    echo "OK<br />\n";
     fclose($fd);
     flush();
     echo "Adding Initial User...\n";
@@ -179,12 +179,12 @@ if ($upgrade != 1) {
     $iuser = "admin";
     $iuname = "admin";
     $igroup = $newname;
-    //echo "INSERT INTO `groups` VALUES (1,'$igroup','$iuser')<br>\n";
+    //echo "INSERT INTO `groups` VALUES (1,'$igroup','$iuser')<br />\n";
     if (mysql_query("INSERT INTO `groups` (id, name, user) VALUES (1,'$igroup','$iuser')") == false) {
         echo "ERROR.  Could not run queries.\n";
         echo "<p>".mysql_error()." (#".mysql_errno().")\n";
         flush();
-        break;
+        exit;
     }
 
     //// ViCareplus : As per NIST standard, SHA1 hash/digest of 'pass' is used
@@ -192,10 +192,10 @@ if ($upgrade != 1) {
         echo "ERROR.  Could not run queries.\n";
         echo "<p>".mysql_error()." (#".mysql_errno().")\n";
         flush();
-        break;
+        exit;
     }
 
-    echo "OK<br>\n";
+    echo "OK<br />\n";
     flush();
 
     //Now write sqlconf file
@@ -205,7 +205,7 @@ if ($upgrade != 1) {
     if ($fd == false) {
         echo "ERROR.  Could not open config file '$conffile' for writing.\n";
         flush();
-        break;
+        exit;
     }
 
     $string = "<?php\n\n//  OpenEMR\n//  MySQL Config\n//  Referenced from sql.inc\n\n";
@@ -243,9 +243,9 @@ if ($upgrade != 1) {
 
     //it's rather irresponsible to not report errors when writing this file.
     if ($it_died != 0) {
-            echo "ERROR. Couldn't write $it_died lines to config file '$conffile'.\n";
-            flush();
-            break;
+        echo "ERROR. Couldn't write $it_died lines to config file '$conffile'.\n";
+        flush();
+        exit;
     }
 
     fclose($fd);

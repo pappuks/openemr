@@ -1,43 +1,30 @@
 <?php
-// +-----------------------------------------------------------------------------+
-// Copyright (C) 2010 Z&H Consultancy Services Private Limited <sam@zhservices.com>
-//
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-//
-// A copy of the GNU General Public License is included along with this program:
-// openemr/interface/login/GnuGPL.html
-// For more information write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-//
-// Author:   Eldho Chacko <eldho@zhservices.com>
-//           Paul Simon K <paul@zhservices.com>
-//
-// +------------------------------------------------------------------------------+
-//===============================================================================
-//Electronic posting is handled here.
-//===============================================================================
+/*
+ * The functions of this class support the billing process like the script billing_process.php.
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Eldho Chacko <eldho@zhservices.com>
+ * @author    Paul Simon K <paul@zhservices.com>
+ * @author    Stephen Waite <stephen.waite@cmsvt.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) Z&H Consultancy Services Private Limited <sam@zhservices.com>
+ * @copyright Copyright (C) 2018 Stephen Waite <stephen.waite@cmsvt.com>
+ * @copyright Copyright (c) 2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
 
 require_once("../globals.php");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/invoice_summary.inc.php");
 require_once($GLOBALS['OE_SITE_DIR'] . "/statement.inc.php");
-require_once("$srcdir/parse_era.inc.php");
 require_once("$srcdir/options.inc.php");
-require_once("$srcdir/sl_eob.inc.php");
 
+use OpenEMR\Billing\ParseERA;
+use OpenEMR\Billing\SLEOB;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
+use OpenEMR\OeUI\OemrUI;
 
 $hidden_type_code = isset($_POST['hidden_type_code']) ? $_POST['hidden_type_code'] : '';
 $check_date = isset($_POST['check_date']) ? $_POST['check_date'] : '';
@@ -46,7 +33,7 @@ $deposit_date = isset($_POST['deposit_date']) ? $_POST['deposit_date'] : '';
 $type_code = isset($_POST['type_code']) ? $_POST['type_code'] : '';
 
 //===============================================================================
-// This is called back by parse_era() if we are processing X12 835's.
+// This is called back by ParseERA::parse_era() if we are processing X12 835's.
 $alertmsg = '';
 $where = '';
 $eraname = '';
@@ -58,7 +45,7 @@ function era_callback(&$out)
     ++$eracount;
     $eraname = $out['gs_date'] . '_' . ltrim($out['isa_control_number'], '0') .
     '_' . ltrim($out['payer_id'], '0');
-    list($pid, $encounter, $invnumber) = slInvoiceNumber($out);
+    list($pid, $encounter, $invnumber) = SLEOB::slInvoiceNumber($out);
     if ($pid && $encounter) {
         if ($where) {
             $where .= ' OR ';
@@ -69,8 +56,8 @@ function era_callback(&$out)
 //===============================================================================
   // Handle X12 835 file upload.
 if ($_FILES['form_erafile']['size']) {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     $tmp_name = $_FILES['form_erafile']['tmp_name'];
@@ -80,11 +67,11 @@ if ($_FILES['form_erafile']['size']) {
         exec("unzip -p " . escapeshellarg($tmp_name.".zip") . " > " . escapeshellarg($tmp_name));
         unlink("$tmp_name.zip");
     }
-    $alertmsg .= parse_era($tmp_name, 'era_callback');
-    $erafullname = $GLOBALS['OE_SITE_DIR'] . "/era/$eraname.edi";
+    $alertmsg .= ParseERA::parse_era($tmp_name, 'era_callback');
+    $erafullname = $GLOBALS['OE_SITE_DIR'] . "/documents/era/$eraname.edi";
     if (is_file($erafullname)) {
         $alertmsg .=  xl("Warning").': '. xl("Set").' '.$eraname.' '. xl("was already uploaded").' ';
-        if (is_file($GLOBALS['OE_SITE_DIR'] . "/era/$eraname.html")) {
+        if (is_file($GLOBALS['OE_SITE_DIR'] . "/documents/era/$eraname.html")) {
             $Processed=1;
             $alertmsg .=  xl("and processed.").' ';
         } else {
@@ -102,23 +89,23 @@ if ($_FILES['form_erafile']['size']) {
 <head>
     <?php Header::setupHeader(['datetime-picker', 'common']);?>
     <?php require_once("{$GLOBALS['srcdir']}/ajax/payment_ajax_jav.inc.php"); ?>
-    <script language="javascript" type="text/javascript">
+    <script>
     function Validate()
     {
      if(document.getElementById('uploadedfile').value=='')
       {
-       alert("<?php echo xls('Please Choose a file');?>");
+       alert(<?php echo xlj('Please Choose a file');?>);
        return false;
       }
      if(document.getElementById('hidden_type_code').value=='')
       {
-       alert("<?php echo xls('Select Insurance, by typing'); ?>");
+       alert(<?php echo xlj('Select Insurance, by typing'); ?>);
        document.getElementById('type_code').focus();
        return false;
       }
      if(document.getElementById('hidden_type_code').value!=document.getElementById('div_insurance_or_patient').innerHTML)
       {
-       alert("<?php echo xls('Take Insurance, from Drop Down'); ?>");
+       alert(<?php echo xlj('Take Insurance, from Drop Down'); ?>);
        document.getElementById('type_code').focus();
        return false;
       }
@@ -136,18 +123,18 @@ if ($_FILES['form_erafile']['size']) {
         if ($_FILES['form_erafile']['size']) {
             ?>
             var f = document.forms[0];
-            var debug = <?php echo attr($_REQUEST['form_without']*1); ?> ;
+            var debug = <?php echo js_escape($_REQUEST['form_without']*1); ?> ;
          var paydate = f.check_date.value;
          var post_to_date = f.post_to_date.value;
          var deposit_date = f.deposit_date.value;
-         window.open('sl_eob_process.php?eraname=<?php echo attr(urlencode($eraname)); ?>&debug=' + debug + '&paydate=' + paydate + '&post_to_date=' + post_to_date + '&deposit_date=' + deposit_date + '&original=original' + '&InsId=<?php echo attr(urlencode($hidden_type_code)); ?>' + '&csrf_token_form=<?php echo attr(urlencode(collectCsrfToken())); ?>' , '_blank');
+         window.open('sl_eob_process.php?eraname=' + <?php echo js_url($eraname); ?> + '&debug=' + encodeURIComponent(debug) + '&paydate=' + encodeURIComponent(paydate) + '&post_to_date=' + encodeURIComponent(post_to_date) + '&deposit_date=' + encodeURIComponent(deposit_date) + '&original=original' + '&InsId=' + <?php echo js_url($hidden_type_code); ?> + '&csrf_token_form=' + <?php echo js_url(CsrfUtils::collectCsrfToken()); ?>, '_blank');
          return false;
-        <?php
+            <?php
         }
         ?>
     }
 
-    $(document).ready(function() {
+    $(function() {
        $('.datepicker').datetimepicker({
             <?php $datetimepicker_timepicker = false; ?>
             <?php $datetimepicker_showseconds = false; ?>
@@ -157,61 +144,33 @@ if ($_FILES['form_erafile']['size']) {
        });
     });
     </script>
-    <script language="javascript" type="text/javascript">
+    <script>
     document.onclick=HideTheAjaxDivs;
     </script>
     <style>
     #ajax_div_insurance {
-       position: absolute;
-       z-index:10;
-       background-color: #FBFDD0;
-       border: 1px solid #ccc;
-       padding: 10px;
+        position: absolute;
+        z-index: 10;
+        background-color: #FBFDD0;
+        border: 1px solid var(--gray);
+        padding: 10px;
     }
-    .bottom{border-bottom:1px solid black;}
-    .top{border-top:1px solid black;}
-    .left{border-left:1px solid black;}
-    .right{border-right:1px solid black;}
+    .bottom {
+        border-bottom:1px solid var(--black);
+    }
+    .top { 
+        border-top:1px solid var(--black);
+    }
+    .left {
+        border-left:1px solid var(--black);
+    }
+    .right {
+        border-right:1px solid var(--black);
+    }
     @media only screen and (max-width: 768px) {
         [class*="col-"] {
             width: 100%;
-            text-align: left!Important;
-        }
-        .navbar-toggle>span.icon-bar {
-            background-color: #68171A ! Important;
-        }
-        .navbar-default .navbar-toggle {
-            border-color: #4a4a4a;
-        }
-        .navbar-default .navbar-toggle:focus, .navbar-default .navbar-toggle:hover {
-            background-color: #f2f2f2 !Important;
-            font-weight: 900 !Important;
-            color: #000000 !Important;
-        }
-        .navbar-color {
-            background-color: #E5E5E5;
-        }
-        .icon-bar {
-            background-color: #68171A;
-        }
-        .navbar-header {
-            float: none;
-        }
-        .navbar-toggle {
-            display: block;
-            background-color: #f2f2f2;
-        }
-        .navbar-nav {
-            float: none!important;
-        }
-        .navbar-nav>li {
-            float: none;
-        }
-        .navbar-collapse.collapse.in {
-            z-index: 100;
-            background-color: #dfdfdf;
-            font-weight: 700;
-            color: #000000 !Important;
+            text-align: left !important;
         }
     }
 
@@ -219,19 +178,19 @@ if ($_FILES['form_erafile']['size']) {
     @media only screen and (max-width: 700px) {
         [class*="col-"] {
         width: 100%;
-        text-align:left!Important;
+        text-align: left !important;
         }
-        #form_without{
-        margin-left:0px !Important;
+        #form_without {
+        margin-left: 0px !important;
         }
 
     }
-    .input-group .form-control{
+    .input-group .form-control {
         margin-bottom: 3px;
-        margin-left:0px;
+        margin-left: 0px;
     }
-    #form_without{
-        margin-left:5px !Important;
+    #form_without {
+        margin-left: 5px !important;
     }
     </style>
     <?php
@@ -244,99 +203,103 @@ if ($_FILES['form_erafile']['size']) {
     require_once("$srcdir/expand_contract_inc.php");
     ?>
     <title><?php echo xlt('ERA Posting'); ?></title>
+    <?php
+    $arrOeUiSettings = array(
+        'heading_title' => xl('Payments'),
+        'include_patient_name' => false,// use only in appropriate pages
+        'expandable' => true,
+        'expandable_files' => array("era_payments_xpd", "search_payments_xpd", "new_payment_xpd"),//all file names need suffix _xpd
+        'action' => "",//conceal, reveal, search, reset, link or back
+        'action_title' => "",
+        'action_href' => "",//only for actions - reset, link or back
+        'show_help_icon' => false,
+        'help_file_name' => ""
+    );
+    $oemr_ui = new OemrUI($arrOeUiSettings);
+    ?>
 </head>
 <body class="body_top" onload="OnloadAction()">
-    <div class="<?php echo $container;?> expandable">
+    <div id="container_div" class="<?php echo attr($oemr_ui->oeContainer());?>">
         <div class="row">
             <div class="col-sm-12">
                 <div class="page-header">
-                    <h2>
-                        <?php echo xlt('Payments'); ?> <i id="exp_cont_icon" class="fa <?php echo attr($expand_icon_class);?> oe-superscript-small expand_contract"
-                        title="<?php echo attr($expand_title); ?>" aria-hidden="true"></i>
-                    </h2>
+                    <?php echo $oemr_ui->pageHeading() . "\r\n"; ?>
                 </div>
             </div>
         </div>
-        <div class="row">
-            <div class="col-sm-12">
-                <nav class="navbar navbar-default navbar-color navbar-static-top" >
-                    <div class="container-fluid">
-                        <div class="navbar-header">
-                            <button class="navbar-toggle" data-target="#myNavbar" data-toggle="collapse" type="button"><span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span></button>
-                        </div>
-                        <div class="collapse navbar-collapse" id="myNavbar" >
-                            <ul class="nav navbar-nav" >
-                                <li class="oe-bold-black">
-                                    <a href='new_payment.php' style="font-weight:700; color:#000000"><?php echo xlt('New Payment'); ?></a>
-                                </li>
-                                <li class="oe-bold-black" >
-                                    <a href='search_payments.php' style="font-weight:700; color:#000000"><?php echo xlt('Search Payment'); ?></a>
-                                </li>
-                                <li class="active">
-                                    <a href='era_payments.php' style="font-weight:700; color:#000000"><?php echo xlt('ERA Posting'); ?></a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </nav>
+        <nav class="navbar navbar-nav navbar-expand-md navbar-light text-body bg-light mb-4 p-4">
+            <button class="navbar-toggler icon-bar" data-target="#myNavbar" data-toggle="collapse" type="button"> <span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="myNavbar">
+                <ul class="navbar-nav mr-auto">
+                    <li class="nav-item">
+                        <a class="nav-link font-weight-bold" href='new_payment.php'><?php echo xlt('New Payment'); ?></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link font-weight-bold" href='search_payments.php'><?php echo xlt('Search Payment'); ?></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active font-weight-bold" href='era_payments.php'><?php echo xlt('ERA Posting'); ?></a>
+                    </li>
+                </ul>
             </div>
-        </div>
-
+        </nav>
         <div class="row">
             <div class="col-sm-12">
                 <form action='era_payments.php' enctype="multipart/form-data" method='post' style="display:inline">
-                    <input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+                    <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
                     <fieldset>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="form-group col-xs9 oe-file-div">
+                        <div class="col-12 oe-custom-line">
+                            <div class="form-group col-9 oe-file-div">
                                 <div class="input-group">
-                                    <label class="input-group-btn">
-                                        <span class="btn btn-default">
-                                            <?php echo xlt('Browse'); ?>&hellip;<input type="file" id="uploadedfile" name="form_erafile" style="display: none;" >
-                                            <input name="MAX_FILE_SIZE" type="hidden" value="5000000">
+                                    <label class="input-group-prepend">
+                                        <span class="btn btn-secondary">
+                                            <?php echo xlt('Browse'); ?>&hellip;<input type="file" id="uploadedfile" name="form_erafile" style="display: none;" />
+                                            <input name="MAX_FILE_SIZE" type="hidden" value="5000000" />
                                         </span>
                                     </label>
-                                    <input type="text" class="form-control" placeholder="<?php echo xla('Click Browse and select one Electronic Remittance Advice (ERA) file...'); ?>" readonly>
+                                    <input type="text" class="form-control" placeholder="<?php echo xla('Click Browse and select one Electronic Remittance Advice (ERA) file...'); ?>" readonly />
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="form-group col-xs-3">
+                        <div class="col-12 oe-custom-line">
+                            <div class="form-group col-3">
                                 <label class="control-label" for="check_date"><?php echo xlt('Date'); ?>:</label>
-                                <input class="form-control datepicker" id='check_date' name='check_date' onkeydown="PreventIt(event)" type='text' value="<?php echo attr($check_date); ?>">
+                                <input class="form-control datepicker" id='check_date' name='check_date' onkeydown="PreventIt(event)" type='text' value="<?php echo attr($check_date); ?>" />
                             </div>
-                            <div class="form-group col-xs-3">
+                            <div class="form-group col-3">
                                 <label class="control-label" for="post_to_date"><?php echo xlt('Post To Date'); ?>:</label>
-                                <input class="form-control datepicker" id='post_to_date' name='post_to_date' onkeydown="PreventIt(event)" type='text' value="<?php echo attr($post_to_date); ?>">
+                                <input class="form-control datepicker" id='post_to_date' name='post_to_date' onkeydown="PreventIt(event)" type='text' value="<?php echo attr($post_to_date); ?>" />
                             </div>
-                            <div class="form-group col-xs-3 clearfix">
+                            <div class="form-group col-3 clearfix">
                                 <label class="control-label" for="form_without"><?php echo xlt('Select'); ?>:</label>
                                 <label class="checkbox">
-                                    <input name='form_without'  id='form_without' type='checkbox' value='1'> <span class="oe-ckbox-label"><?php echo xlt('Without Update'); ?></span>
+                                    <input name='form_without'  id='form_without' type='checkbox' value='1' />
+                                    <span class="oe-ckbox-label"><?php echo xlt('Without Update'); ?></span>
                                 </label>
                             </div>
-                            <div class="form-group col-xs-3">
+                            <div class="form-group col-3">
                                 <label class="control-label" for="deposit_date"><?php echo xlt('Deposit Date'); ?>:</label>
-                                <input class="form-control datepicker" id='deposit_date' name='deposit_date' onkeydown="PreventIt(event)" type='text' value="<?php echo attr($deposit_date); ?>">
+                                <input class="form-control datepicker" id='deposit_date' name='deposit_date' onkeydown="PreventIt(event)" type='text' value="<?php echo attr($deposit_date); ?>" />
                             </div>
                         </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="form-group col-xs-6">
+                        <div class="col-12 oe-custom-line">
+                            <div class="form-group col-6">
                                 <label class="control-label" for="type_code"><?php echo xlt('Insurance'); ?>:</label>
-                                <input id="hidden_ajax_close_value" type="hidden" value="<?php echo attr($type_code); ?>">
-                                <input autocomplete="off" class="form-control" id='type_code' name='type_code' onkeydown="PreventIt(event)"  type="text" value="<?php echo attr($type_code); ?>"><br>
+                                <input id="hidden_ajax_close_value" type="hidden" value="<?php echo attr($type_code); ?>" />
+                                <input autocomplete="off" class="form-control" id='type_code' name='type_code' onkeydown="PreventIt(event)"  type="text" value="<?php echo attr($type_code); ?>" />
+                                <br />
                                 <!--onKeyUp="ajaxFunction(event,'non','search_payments.php');"-->
                                 <div id='ajax_div_insurance_section'>
                                     <div id='ajax_div_insurance_error'></div>
                                     <div id="ajax_div_insurance" style="display:none;"></div>
                                 </div>
                             </div>
-                            <div class="form-group col-xs-3">
+                            <div class="form-group col-3">
                                 <label class="control-label" for="div_insurance_or_patient"><?php echo xlt('Insurance ID'); ?>:</label>
                                 <div class="form-control" id="div_insurance_or_patient" >
                                     <?php echo text($hidden_type_code); ?>
                                 </div>
-                                <input id="description" name="description" type="hidden">
+                                <input id="description" name="description" type="hidden" />
                             </div>
                         </div>
                     </fieldset>
@@ -344,50 +307,18 @@ if ($_FILES['form_erafile']['size']) {
                     <div class="form-group clearfix">
                         <div class="col-sm-12 text-left position-override">
                             <div class="btn-group" role="group">
-                                <a class="btn btn-default btn-save" href="#" onclick="javascript:return Validate();"><span><?php echo xlt('Process ERA File');?></span></a>
+                                <a class="btn btn-secondary btn-save" href="#" onclick="javascript:return Validate();"><?php echo xlt('Process ERA File');?></a>
                             </div>
                         </div>
                     </div>
-                    <input type="hidden" name="after_value" id="after_value" value="<?php echo attr($alertmsg); ?>"/>
-                    <input type="hidden" name="hidden_type_code" id="hidden_type_code" value="<?php echo attr($hidden_type_code); ?>"/>
+                    <input type="hidden" name="after_value" id="after_value" value="<?php echo attr($alertmsg); ?>" />
+                    <input type="hidden" name="hidden_type_code" id="hidden_type_code" value="<?php echo attr($hidden_type_code); ?>" />
                     <input type='hidden' name='ajax_mode' id='ajax_mode' value='' />
                 </form>
             </div>
         </div>
     </div><!-- End of Container Div-->
-    <script>
-        $(function() {
-            //https://www.abeautifulsite.net/whipping-file-inputs-into-shape-with-bootstrap-3
-            // We can attach the `fileselect` event to all file inputs on the page
-            $(document).on('change', ':file', function() {
-                var input = $(this),
-                numFiles = input.get(0).files ? input.get(0).files.length : 1,
-                label = input.val().replace(/\\/g, '/').replace(/.*\//, '');
-                input.trigger('fileselect', [numFiles, label]);
-            });
-
-            // We can watch for our custom `fileselect` event like this
-            $(document).ready( function() {
-                $(':file').on('fileselect', function(event, numFiles, label) {
-                    var input = $(this).parents('.input-group').find(':text'),
-                    log = numFiles > 1 ? numFiles + ' files selected' : label;
-
-                    if( input.length ) {
-                    input.val(log);
-                    }
-                    else {
-                    if( log ) alert(log);
-                    }
-                });
-            });
-
-            });
-    </script>
-    <script>
-        <?php
-        // jQuery script to change expanded/centered state dynamically
-        require_once("../expand_contract_js.php");
-        ?>
-    </script>
+    <?php $oemr_ui->oeBelowContainerDiv();?>
+    <script src = '<?php echo $webroot;?>/library/js/oeUI/oeFileUploads.js'></script>
 </body>
 </html>

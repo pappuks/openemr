@@ -1,23 +1,12 @@
 /**
  * Core javascript functions for the fee sheet review features
- * 
- * Copyright (C) 2013-2014 Kevin Yeh <kevin.y@integralemr.com> and OEMR <www.oemr.org>
  *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
- * @package OpenEMR
- * @author  Kevin Yeh <kevin.y@integralemr.com>
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Kevin Yeh <kevin.y@integralemr.com>
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2013-2014 Kevin Yeh <kevin.y@integralemr.com> and OEMR <www.oemr.org>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 function refresh_codes()
@@ -45,7 +34,7 @@ function update_display_table(data)
     var new_table=new_info.find(display_table_selector);
 
     // Use this to replace the contents of this table in the current document.
-    $(display_table_selector).replaceWith(new_table);  
+    $(display_table_selector).replaceWith(new_table);
 
     // Copy in the latest form_checksum value.
     var new_checksum = new_info.find('input[name="form_checksum"]').val();
@@ -67,11 +56,11 @@ function update_display_table(data)
         for(var i=0;i<diags_matches.length;i++)
             {
                 eval(diags_matches[i]);
-            }                
+            }
     }
     var justifications=$("select[onchange='setJustify(this)']");
     justifications.change();
-    
+
     tag_justify_rows($(display_table_selector));
 
     return rc;
@@ -103,10 +92,10 @@ function codeselect_and_save(selobj)
             function(data) {
               update_display_table(data);
             }
-          ); 
+          );
         }
       }
-    ); 
+    );
   }
 }
 
@@ -128,47 +117,73 @@ function parse_row_justify(row)
     return retval;
 }
 
-function justify_start(evt)
-{
-    var jqElem=$(this);
-    var parent=jqElem.parent()
-    var template_div=parent.find("div.justify_template");
-    if(template_div.length==0)
-    {
-        var template_div=$("<div class='justify_template'></div>");
-        template_div.attr("data-bind","template: {name: 'justify-display', data: justify}");
-        jqElem.after(template_div);      
-    }
-    $(".cancel_dialog").click();
-    var current_justify_choices=parse_row_justify(parent.parent());
-    var justify_model=new fee_sheet_justify_view_model(parent.attr("billing_id"),enc,pid,current_justify_choices);
-    ko.applyBindings(justify_model,template_div.get(0));
+function justify_start(evt) {
+    const jqElem = $(this); // make sure is in scope after save.
+    const wait = '<i id="wait" class="fa fa-refresh fa-spin fa-1x"></i>';
+    jqElem.after().append(wait); // for the slow pokes..
+    let myForm = document.getElementById('fee_sheet_form');
+    let formData = new FormData(myForm);
+    formData.append('running_as_ajax', "1");
+    formData.append('dx_update', "1");
+    // save current form
+    $.ajax({
+        url: fee_sheet_new,
+        processData: false,
+        contentType: false,
+        cache: false,
+        type: 'POST',
+        data: formData,
+        beforeSend: function () {
+            top.restoreSession();
+        }
+    }).done(function (data) {
+        // now init justify
+        let parent = jqElem.parent();
+        let template_div = parent.find("div.justify_template");
+        if (template_div.length == 0) {
+            template_div = $("<div class='justify_template'></div>");
+            template_div.attr("data-bind", "template: {name: 'justify-display', data: justify}");
+            jqElem.after(template_div);
+        }
+        $(".cancel_dialog").click(); // this just ensures a dialog is not in view.
+        $(display_table_selector).parent().css('min-height', '500px');
+        let current_justify_choices = parse_row_justify(parent.parent());
+        let justify_model = new fee_sheet_justify_view_model(parent.attr("billing_id"), enc, pid, current_justify_choices);
+        ko.cleanNode(template_div.get(0));
+        ko.applyBindings(justify_model, template_div.get(0));
+        $("#wait").remove();
+    });
 }
 
-function tag_justify_rows(display)
-{
-    var justify_selectors=display.find("select[onchange^='setJustify']").parent();
-    var justify_rows=justify_selectors.parent("tr")
-    var justify_td=justify_rows.children("td:first-child").addClass("has_justify");
-    justify_td.each(function(idx,elem){
+function tag_justify_rows(display) {
+    var justify_selectors = display.find("select[onchange^='setJustify']").parent();
+    var justify_rows = justify_selectors.parent("tr");
+    var justify_td = justify_rows.children("td:first-child").addClass("has_justify");
+    justify_td.each(function (idx, elem) {
         // This code takes the label text and "wraps it around a span for e"
-        var jqElem=$(elem);
-        if(jqElem.find("a.justify_label").length==0)
-        {
-            var label=jqElem.text();
-            var html=jqElem.html().substr(label.length);
+        var jqElem = $(elem);
+        if (jqElem.find("a.justify_label").length == 0) {
+            var pre_label = jqElem.html();
+            if (pre_label.indexOf('<del>') !== -1) {
+                // lets not add an anchor for justify if we are going to delete
+                // procedure anyway so, continue onwards...
+                return true;
+            }
+            var label = jqElem.text();
+            var html = jqElem.html().substr(label.length);
             jqElem.html(html);
-            $("<a class='justify_label'>"+label+"</a>").appendTo(jqElem).on({click:justify_start}).attr("title",justify_click_title);;        
+            $("<a class='justify_label'>" + label + "</a>").appendTo(jqElem).on({click: justify_start}).attr("title", justify_click_title);
+            ;
         }
     });
-    var id_fields=justify_rows.find("input[type='hidden'][name$='[id]']");
-    id_fields.each(function(idx,elem){
-        var jqElem=$(elem);
-        var td=jqElem.parent();
+    var id_fields = justify_rows.find("input[type='hidden'][name$='[id]']");
+    id_fields.each(function (idx, elem) {
+        var jqElem = $(elem);
+        var td = jqElem.parent();
         td.addClass("has_id");
-        td.attr("billing_id",jqElem.attr("value"));
+        td.attr("billing_id", jqElem.attr("value"));
     });
-    
+
 }
 
 function setup_core()

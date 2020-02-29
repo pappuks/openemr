@@ -1,40 +1,30 @@
 <?php
 /**
-* This script merges two patient charts into a single patient chart.
-* It is to correct the error of creating a duplicate patient.
-*
-* Copyright (C) 2013 Rod Roark <rod@sunsetsystems.com>
-*
-* LICENSE: This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-* You should have received a copy of the GNU General Public License
-* along with this program.  If not, see <http://opensource.org/licenses/gpl-license.php>.
-*
-* @package   OpenEMR
-* @author    Rod Roark <rod@sunsetsystems.com>
-*/
+ * This script merges two patient charts into a single patient chart.
+ * It is to correct the error of creating a duplicate patient.
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2013 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
 
 set_time_limit(0);
 
-
-
-
 require_once("../globals.php");
-require_once("$srcdir/acl.inc");
-require_once("$srcdir/log.inc");
 
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
 // Set this to true for production use. If false you will get a "dry run" with no updates.
 $PRODUCTION = true;
 
-if (!acl_check('admin', 'super')) {
+if (!AclMain::aclCheckCore('admin', 'super')) {
     die(xlt('Not authorized'));
 }
 ?>
@@ -45,9 +35,9 @@ if (!acl_check('admin', 'super')) {
 <title><?php echo xlt('Merge Patients'); ?></title>
     <?php Header::setupHeader(['jquery-ui']); ?>
 
-<script language="JavaScript">
+<script>
 
-var mypcc = '<?php echo $GLOBALS['phone_country_code']; ?>';
+var mypcc = <?php echo js_escape($GLOBALS['phone_country_code']); ?>;
 
 var el_pt_name;
 var el_pt_id;
@@ -78,13 +68,13 @@ function sel_patient(ename, epid) {
 function deleteRows($tblname, $colname, $source_pid)
 {
     global $PRODUCTION;
-    $crow = sqlQuery("SELECT COUNT(*) AS count FROM `$tblname` WHERE `$colname` = $source_pid");
+    $crow = sqlQuery("SELECT COUNT(*) AS count FROM " . escape_table_name($tblname) . " WHERE " . escape_sql_column_name($colname, array($tblname)) . " = ?", array($source_pid));
     $count = $crow['count'];
     if ($count) {
-        $sql = "DELETE FROM `$tblname` WHERE `$colname` = $source_pid";
+        $sql = "DELETE FROM " . escape_table_name($tblname) . " WHERE " . escape_sql_column_name($colname, array($tblname)) . " = ?";
         echo "<br />$sql ($count)";
         if ($PRODUCTION) {
-            sqlStatement($sql);
+            sqlStatement($sql, array($source_pid));
         }
     }
 }
@@ -92,21 +82,25 @@ function deleteRows($tblname, $colname, $source_pid)
 function updateRows($tblname, $colname, $source_pid, $target_pid)
 {
     global $PRODUCTION;
-    $crow = sqlQuery("SELECT COUNT(*) AS count FROM `$tblname` WHERE `$colname` = $source_pid");
+    $crow = sqlQuery("SELECT COUNT(*) AS count FROM " . escape_table_name($tblname) . " WHERE " . escape_sql_column_name($colname, array($tblname)) . " = ?", array($source_pid));
     $count = $crow['count'];
     if ($count) {
-        $sql = "UPDATE `$tblname` SET `$colname` = '$target_pid' WHERE `$colname` = $source_pid";
+        $sql = "UPDATE " . escape_table_name($tblname) . " SET " . escape_sql_column_name($colname, array($tblname)) . " = ? WHERE " . escape_sql_column_name($colname, array($tblname)) . " = ?";
         echo "<br />$sql ($count)";
         if ($PRODUCTION) {
-            sqlStatement($sql);
+            sqlStatement($sql, array($target_pid, $source_pid));
         }
     }
 }
 
 if (!empty($_POST['form_submit'])) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+
     $target_pid = intval($_POST['form_target_pid']);
     $source_pid = intval($_POST['form_source_pid']);
-    echo "<div class='well'>";
+    echo "<div class='jumbotron jumbotron-fluid'>";
     if ($target_pid == $source_pid) {
         die(xlt('Target and source pid may not be the same!'));
     }
@@ -139,13 +133,13 @@ if (!empty($_POST['form_submit'])) {
         die(xlt('Target and source DOB do not match'));
     }
 
-    $tdocdir = "$OE_SITE_DIR/documents/$target_pid";
-    $sdocdir = "$OE_SITE_DIR/documents/$source_pid";
+    $tdocdir = "$OE_SITE_DIR/documents/" . check_file_dir_name($target_pid);
+    $sdocdir = "$OE_SITE_DIR/documents/" . check_file_dir_name($source_pid);
     $sencdir = "$sdocdir/encounters";
     $tencdir = "$tdocdir/encounters";
 
   // Change normal documents first as that could fail if CouchDB connection fails.
-    $dres = sqlStatement("SELECT * FROM `documents` WHERE `foreign_id` = '$source_pid'");
+    $dres = sqlStatement("SELECT * FROM `documents` WHERE `foreign_id` = ?", array($source_pid));
     while ($drow = sqlFetchArray($dres)) {
         $d = new Document($drow['id']);
         echo "<br />" . xlt('Changing patient ID for document') . ' ' . text($d->get_url_file());
@@ -168,7 +162,7 @@ if (!empty($_POST['form_submit'])) {
 
         $dh = opendir($sencdir);
         if (!$dh) {
-            die(xlt('Cannot read directory') . " '$sencdir'");
+            die(xlt('Cannot read directory') . " '" . text($sencdir) . "'");
         }
 
         while (false !== ($sfname = readdir($dh))) {
@@ -177,7 +171,7 @@ if (!empty($_POST['form_submit'])) {
             }
 
             if ($sfname == 'index.html') {
-                echo "<br />" . xlt('Deleting') . " $sencdir/$sfname";
+                echo "<br />" . xlt('Deleting') . " " . text($sencdir) . "/" . text($sfname);
                 if ($PRODUCTION) {
                     if (!unlink("$sencdir/$sfname")) {
                         die("<br />" . xlt('Delete failed!'));
@@ -187,7 +181,7 @@ if (!empty($_POST['form_submit'])) {
                 continue;
             }
 
-            echo "<br />" . xlt('Moving') . " $sencdir/$sfname " . xlt('to') . " $tencdir/$sfname";
+            echo "<br />" . xlt('Moving') . " " . text($sencdir) . "/" . text($sfname) . " " . xlt('to{{Destination}}') . " " . text($tencdir) . "/" . text($sfname);
             if ($PRODUCTION) {
                 if (!rename("$sencdir/$sfname", "$tencdir/$sfname")) {
                     die("<br />" . xlt('Move failed!'));
@@ -218,7 +212,7 @@ if (!empty($_POST['form_submit'])) {
         } else if ($tblname == 'log') {
             // Don't mess with log data.
         } else {
-            $crow = sqlQuery("SHOW COLUMNS FROM `$tblname` WHERE " .
+            $crow = sqlQuery("SHOW COLUMNS FROM `" . escape_table_name($tblname) . "` WHERE " .
             "`Field` LIKE 'pid' OR `Field` LIKE 'patient_id'");
             if (!empty($crow['Field'])) {
                   $colname = $crow['Field'];
@@ -238,17 +232,15 @@ if (!empty($_POST['form_submit'])) {
 </p>
 
 <form method='post' action='merge_patients.php'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 <div class="table-responsive">
-<table style='width:100%'>
+<table class="table w-100">
  <tr>
   <td>
     <?php echo xlt('Target Patient') ?>
   </td>
   <td>
-   <input type='text' size='30' name='form_target_patient'
-    value=' (<?php echo xla('Click to select'); ?>)'
-    onclick='sel_patient(this, this.form.form_target_pid)'
-    title='<?php echo xla('Click to select patient'); ?>' readonly />
+   <input type='text' class="form-control" size='30' name='form_target_patient' value=' (<?php echo xla('Click to select'); ?>)' onclick='sel_patient(this, this.form.form_target_pid)' title='<?php echo xla('Click to select patient'); ?>' readonly />
    <input type='hidden' name='form_target_pid' value='0' />
   </td>
   <td>
@@ -260,7 +252,7 @@ if (!empty($_POST['form_submit'])) {
     <?php echo xlt('Source Patient') ?>
   </td>
   <td>
-   <input type='text' size='30' name='form_source_patient'
+   <input type='text' class='form-control' size='30' name='form_source_patient'
     value=' (<?php echo xla('Click to select'); ?>)'
     onclick='sel_patient(this, this.form.form_source_pid)'
     title='<?php echo xla('Click to select patient'); ?>' readonly />
@@ -271,11 +263,11 @@ if (!empty($_POST['form_submit'])) {
   </td>
  </tr>
 </table>
-<p><input type='submit' name='form_submit' value='<?php echo xla('Merge'); ?>' /></p>
+<p><input type='submit' class="btn btn-primary" name='form_submit' value='<?php echo xla('Merge'); ?>' /></p>
 </div>
 </form>
-<div class="well well-lg">
-    <p><strong><?php echo xlt('This utility is experimental.  Back up your database and documents before using it!'); ?></strong></p>
+<div class="jumbotron">
+    <p class="font-weight-bold"><?php echo xlt('This utility is experimental. Back up your database and documents before using it!'); ?></p>
 
 <?php if (!$PRODUCTION) { ?>
 <p><?php echo xlt('This will be a "dry run" with no physical data updates.'); ?></p>

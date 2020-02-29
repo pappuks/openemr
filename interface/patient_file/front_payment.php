@@ -7,22 +7,23 @@
  * @author    Rod Roark <rod@sunsetsystems.com>
  * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2006-2016 Rod Roark <rod@sunsetsystems.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
 require_once("../globals.php");
-require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/billing.inc");
 require_once("$srcdir/payment.inc.php");
 require_once("$srcdir/forms.inc");
-require_once("$srcdir/sl_eob.inc.php");
-require_once("$srcdir/invoice_summary.inc.php");
 require_once("../../custom/code_types.inc.php");
 require_once("$srcdir/options.inc.php");
 require_once("$srcdir/encounter_events.inc.php");
 
+use OpenEMR\Billing\BillingUtilities;
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
+use OpenEMR\OeUI\OemrUI;
 use OpenEMR\Services\FacilityService;
 
 $pid = $_REQUEST['hidden_patient_code'] > 0 ? $_REQUEST['hidden_patient_code'] : $pid;
@@ -68,16 +69,16 @@ function echoLine($iname, $date, $charges, $ptpaid, $inspaid, $duept, $encounter
     $encounter = $encounter ? $encounter : '';
     echo " <tr id='tr_" . attr($var_index) . "' >\n";
     echo "  <td class='detail'>" . text(oeFormatShortDate($date)) . "</td>\n";
-    echo "  <td class='detail' id='" . attr($date) . "' align='center'>" . attr($encounter) . "</td>\n";
-    echo "  <td class='detail' align='center' id='td_charges_$var_index' >" . attr(bucks($charges)) . "</td>\n";
-    echo "  <td class='detail' align='center' id='td_inspaid_$var_index' >" . attr(bucks($inspaid * -1)) . "</td>\n";
-    echo "  <td class='detail' align='center' id='td_ptpaid_$var_index' >" . attr(bucks($ptpaid * -1)) . "</td>\n";
-    echo "  <td class='detail' align='center' id='td_patient_copay_$var_index' >" . attr(bucks($patcopay)) . "</td>\n";
-    echo "  <td class='detail' align='center' id='td_copay_$var_index' >" . attr(bucks($copay)) . "</td>\n";
-    echo "  <td class='detail' align='center' id='balance_$var_index'>" . attr(bucks($balance)) . "</td>\n";
-    echo "  <td class='detail' align='center' id='duept_$var_index'>" . attr(bucks(round($duept, 2) * 1)) . "</td>\n";
+    echo "  <td class='detail' id='" . attr($date) . "' align='center'>" . text($encounter) . "</td>\n";
+    echo "  <td class='detail' align='center' id='td_charges_$var_index' >" . text(bucks($charges)) . "</td>\n";
+    echo "  <td class='detail' align='center' id='td_inspaid_$var_index' >" . text(bucks($inspaid * -1)) . "</td>\n";
+    echo "  <td class='detail' align='center' id='td_ptpaid_$var_index' >" . text(bucks($ptpaid * -1)) . "</td>\n";
+    echo "  <td class='detail' align='center' id='td_patient_copay_$var_index' >" . text(bucks($patcopay)) . "</td>\n";
+    echo "  <td class='detail' align='center' id='td_copay_$var_index' >" . text(bucks($copay)) . "</td>\n";
+    echo "  <td class='detail' align='center' id='balance_$var_index'>" . text(bucks($balance)) . "</td>\n";
+    echo "  <td class='detail' align='center' id='duept_$var_index'>" . text(bucks(round($duept, 2) * 1)) . "</td>\n";
     echo "  <td class='detail' align='right'><input type='text' name='" . attr($iname) . "'  id='paying_" . attr($var_index) . "' " .
-        " value='" . '' . "' onchange='coloring();calctotal()'  autocomplete='off' " .
+        " value='' onchange='coloring();calctotal()'  autocomplete='off' " .
         "onkeyup='calctotal()'  style='width:50px'/></td>\n";
     echo " </tr>\n";
 }
@@ -153,6 +154,10 @@ $alertmsg = ''; // anything here pops up in an alert box
 
 // If the Save button was clicked...
 if ($_POST['form_save']) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+
     $form_pid = $_POST['form_pid'];
     $form_method = trim($_POST['form_method']);
     $form_source = trim($_POST['form_source']);
@@ -160,7 +165,7 @@ if ($_POST['form_save']) {
     $NameNew = $patdata['fname'] . " " . $patdata['lname'] . " " . $patdata['mname'];
 
     if ($_REQUEST['radio_type_of_payment'] == 'pre_payment') {
-            $payment_id = idSqlStatement(
+            $payment_id = sqlInsert(
                 "insert into ar_session set " .
                 "payer_id = ?" .
                 ", patient_id = ?" .
@@ -194,7 +199,7 @@ if ($_POST['form_save']) {
                     }
                 }
 
-        //----------------------------------------------------------------------------------------------------
+                //----------------------------------------------------------------------------------------------------
                   //Fetching the existing code and modifier
                   $ResultSearchNew = sqlStatement(
                       "SELECT * FROM billing LEFT JOIN code_types ON billing.code_type=code_types.ct_key ".
@@ -211,13 +216,13 @@ if ($_POST['form_save']) {
                     $Modifier = '';
                 }
 
-        //----------------------------------------------------------------------------------------------------
+                //----------------------------------------------------------------------------------------------------
                 if ($_REQUEST['radio_type_of_payment'] == 'copay') {//copay saving to ar_session and ar_activity tables
                     $session_id = sqlInsert(
                         "INSERT INTO ar_session (payer_id,user_id,reference,check_date,deposit_date,pay_total," .
                         " global_amount,payment_type,description,patient_id,payment_method,adjustment_code,post_to_date) " .
                         " VALUES ('0',?,?,now(),now(),?,'','patient','COPAY',?,?,'patient_payment',now())",
-                        array($_SESSION['authId'], $form_source, $amount, $form_pid, $form_method)
+                        array($_SESSION['authUserID'], $form_source, $amount, $form_pid, $form_method)
                     );
 
                     sqlBeginTrans();
@@ -225,7 +230,7 @@ if ($_POST['form_save']) {
                     $insrt_id=sqlInsert(
                         "INSERT INTO ar_activity (pid,encounter,sequence_no,code_type,code,modifier,payer_type,post_time,post_user,session_id,pay_amount,account_code)".
                         " VALUES (?,?,?,?,?,?,0,now(),?,?,?,'PCP')",
-                        array($form_pid, $enc, $sequence_no['increment'], $Codetype, $Code, $Modifier, $_SESSION['authId'], $session_id, $amount)
+                        array($form_pid, $enc, $sequence_no['increment'], $Codetype, $Code, $Modifier, $_SESSION['authUserID'], $session_id, $amount)
                     );
                     sqlCommitTrans();
 
@@ -245,7 +250,7 @@ if ($_POST['form_save']) {
                     }
 
                           $adjustment_code = 'patient_payment';
-                          $payment_id = idSqlStatement(
+                          $payment_id = sqlInsert(
                               "insert into ar_session set " .
                               "payer_id = ?" .
                               ", patient_id = ?" .
@@ -262,11 +267,11 @@ if ($_POST['form_save']) {
                               array(0, $form_pid, $_SESSION['authUserID'], 0, $form_source, $amount, $NameNew, $adjustment_code, $form_method)
                           );
 
-              //--------------------------------------------------------------------------------------------------------------------
+                    //--------------------------------------------------------------------------------------------------------------------
 
                             frontPayment($form_pid, $enc, $form_method, $form_source, 0, $amount, $timestamp);//insertion to 'payments' table.
 
-              //--------------------------------------------------------------------------------------------------------------------
+                    //--------------------------------------------------------------------------------------------------------------------
 
                             $resMoneyGot = sqlStatement(
                                 "SELECT sum(pay_amount) as PatientPay FROM ar_activity where pid =? and " .
@@ -276,7 +281,7 @@ if ($_POST['form_save']) {
                             $rowMoneyGot = sqlFetchArray($resMoneyGot);
                             $Copay = $rowMoneyGot['PatientPay'];
 
-              //--------------------------------------------------------------------------------------------------------------------
+                    //--------------------------------------------------------------------------------------------------------------------
 
                             //Looping the existing code and modifier
                             $ResultSearchNew = sqlStatement(
@@ -363,7 +368,7 @@ if ($_POST['form_save']) {
                                 sqlCommitTrans();
                     }
 
-                  //--------------------------------------------------------------------------------------------------------------------
+                    //--------------------------------------------------------------------------------------------------------------------
                 }//invoice_balance
             }//if ($amount = 0 + $payment)
         }//foreach
@@ -409,32 +414,26 @@ if ($_POST['form_save'] || $_REQUEST['receipt']) {
     }
 
     // Now proceed with printing the receipt.
-?>
+    ?>
 
 <title><?php echo xlt('Receipt for Payment'); ?></title>
-<?php Header::setupHeader(['jquery-ui']); ?>
+    <?php Header::setupHeader(['jquery-ui']); ?>
 <script language="JavaScript">
 
-<?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
+    <?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
 
-$(document).ready(function () {
+$(function() {
     var win = top.printLogSetup ? top : opener.top;
     win.printLogSetup(document.getElementById('printbutton'));
 });
 
 function closeHow(e) {
-    if (top.tab_mode) {
-        top.activateTabByName('pat', true);
-        top.tabCloseByName(window.name);
-    } else {
-        if (opener) {
-            if (opener.name === "left_nav") {
-                dlgclose();
-                return;
-            }
-        }
-        window.history.back();
+    if (opener) {
+        dlgclose();
+        return;
     }
+    top.activateTabByName('pat', true);
+    top.tabCloseByName(window.name);
 }
 
 // This is action to take before printing and is called from restoreSession.php.
@@ -450,7 +449,7 @@ function printlog_before_print() {
 
 // Process click on Delete button.
 function deleteme() {
-    dlgopen('deleter.php?payment=<?php echo attr($payment_key); ?>', '_blank', 500, 450);
+    dlgopen('deleter.php?payment=' + <?php echo js_url($payment_key); ?> + '&csrf_token_form=' + <?php echo js_url(CsrfUtils::collectCsrfToken()); ?>, '_blank', 500, 450);
     return false;
 }
 
@@ -467,30 +466,21 @@ function imdeleted() {
 // This also closes the popup window.
 function toencounter(enc, datestr, topframe) {
     topframe.restoreSession();
-    // Hard-coding of RBot for this purpose is awkward, but since this is a
-    // pop-up and our openemr is left_nav, we have no good clue as to whether
-    // the top frame is more appropriate.
-    if(!top.tab_mode) {
-        topframe.left_nav.forceDual();
-        topframe.left_nav.setEncounter(datestr, enc, '');
-        topframe.left_nav.loadFrame('enc2', 'RBot', 'patient_file/encounter/encounter_top.php?set_encounter=' + enc);
-    } else {
-        top.goToEncounter(enc);
-    }
+    top.goToEncounter(enc);
     if (opener) dlgclose();
 }
 </script>
 </head>
-<body bgcolor='#ffffff'>
+<body bgcolor='var(--white)'>
     <center>
 
     <p><h2><?php echo xlt('Receipt for Payment'); ?></h2>
 
     <p><?php echo text($frow['name']) ?>
-    <br><?php echo text($frow['street']) ?>
-    <br><?php echo text($frow['city'] . ', ' . $frow['state']) . ' ' .
+    <br /><?php echo text($frow['street']) ?>
+    <br /><?php echo text($frow['city'] . ', ' . $frow['state']) . ' ' .
         text($frow['postal_code']) ?>
-    <br><?php echo text($frow['phone']) ?>
+    <br /><?php echo text($frow['phone']) ?>
 
     <p>
     <table border='0' cellspacing='8'>
@@ -542,11 +532,12 @@ function toencounter(enc, datestr, topframe) {
         if ($todaysenc && $todaysenc != $encounter) {
             echo "&nbsp;<input type='button' " .
             "value='" . xla('Open Today`s Visit') . "' " .
-            "onclick='toencounter($todaysenc, \"$today\", (opener ? opener.top : top))' />\n";
+            "onclick='toencounter(" . attr_js($todaysenc) . ", " . attr_js($today) . ", (opener ? opener.top : top))' />\n";
         }
         ?>
 
-        <?php if (acl_check('admin', 'super')) { ?>
+        <?php if (AclMain::aclCheckCore('admin', 'super') || AclMain::aclCheckCore('acct', 'bill')) {
+            // allowing biller to delete payments ?>
         &nbsp;
         <input type='button' value='<?php echo xla('Delete'); ?>' style='color:red' onclick='deleteme()' />
         <?php } ?>
@@ -558,21 +549,21 @@ function toencounter(enc, datestr, topframe) {
     </center>
 </body>
 
-<?php
-  //
-  // End of receipt printing logic.
-  //
+    <?php
+    //
+    // End of receipt printing logic.
+    //
 } else {
-  //
-  // Here we display the form for data entry.
-  //
-?>
+    //
+    // Here we display the form for data entry.
+    //
+    ?>
 <title><?php echo xlt('Record Payment'); ?></title>
 
 <style type="text/css">
  body    { font-family:sans-serif; font-size:10pt; font-weight:normal }
- .dehead { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:bold }
- .detail { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:normal }
+ .dehead { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:bold }
+ .detail { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:normal }
 #ajax_div_patient {
     position: absolute;
     z-index:10;
@@ -589,28 +580,22 @@ function toencounter(enc, datestr, topframe) {
 <script language='JavaScript'>
     var mypcc = '1';
 </script>
-<?php include_once("{$GLOBALS['srcdir']}/ajax/payment_ajax_jav.inc.php"); ?>
+    <?php include_once("{$GLOBALS['srcdir']}/ajax/payment_ajax_jav.inc.php"); ?>
 <script language="javascript" type="text/javascript">
     document.onclick=HideTheAjaxDivs;
 </script>
 
-<script type="text/javascript" src="../../library/topdialog.js"></script>
+    <?php Header::setupAssets('topdialog'); ?>
 
 <script language="JavaScript">
-<?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
+    <?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
 function closeHow(e) {
-    if (top.tab_mode) {
-        top.activateTabByName('pat', true);
-        top.tabCloseByName(window.name);
-    } else {
-       if (opener) {
-            if (opener.name === "left_nav") {
-                dlgclose();
-                return;
-            }
-        }
-        window.history.back();
+    if (opener) {
+        dlgclose();
+        return;
     }
+    top.activateTabByName('pat', true);
+    top.tabCloseByName(window.name);
 }
 function calctotal() {
     var f = document.forms[0];
@@ -641,10 +626,10 @@ function coloring() {
                     document.getElementById('paying_' + i).style.background = '#99CC00';
                 }
                 else if (paying == patient_balance) {
-                    document.getElementById('paying_' + i).style.background = '#ffffff';
+                    document.getElementById('paying_' + i).style.background = 'var(--white)';
                 }
             } else {
-                document.getElementById('paying_' + i).style.background = '#ffffff';
+                document.getElementById('paying_' + i).style.background = 'var(--white)';
             }
         }
         else {
@@ -684,14 +669,14 @@ function validate() {
         }
     }
     if (flgempty) {
-        alert("<?php echo xls('A Payment is Required!. Please input a payment line item entry.') ?>");
+        alert(<?php echo xlj('A Payment is Required!. Please input a payment line item entry.'); ?>);
         return false;
     }
     // continue validation.
     if (((document.getElementById('form_method').options[document.getElementById('form_method').selectedIndex].value == 'check_payment' ||
             document.getElementById('form_method').options[document.getElementById('form_method').selectedIndex].value == 'bank_draft') &&
             document.getElementById('check_number').value == '')) {
-        alert("<?php echo addslashes(xl('Please Fill the Check/Ref Number')) ?>");
+        alert(<?php echo xlj('Please Fill the Check/Ref Number'); ?>);
         document.getElementById('check_number').focus();
         return false;
     }
@@ -699,7 +684,7 @@ function validate() {
         document.getElementById('radio_type_of_payment1').checked == false &&
         document.getElementById('radio_type_of_payment2').checked == false &&
         document.getElementById('radio_type_of_payment4').checked == false) {
-        alert("<?php echo addslashes(xl('Please Select Type Of Payment.')) ?>");
+        alert(<?php echo xlj('Please Select Type Of Payment.'); ?>);
         return false;
     }
     if (document.getElementById('radio_type_of_payment_self1').checked == true ||
@@ -710,7 +695,7 @@ function validate() {
             if (ename.indexOf('form_upay[0') == 0) //Today is this text box.
             {
                 if (elem.value * 1 > 0) {//A warning message, if the amount is posted with out encounter.
-                    if (confirm("<?php echo addslashes(xlt('If patient has appointment click OK to create encounter otherwise, cancel this and then create an encounter for today visit.')) ?>")) {
+                    if (confirm(<?php echo xlj('If patient has appointment click OK to create encounter otherwise, cancel this and then create an encounter for today visit.'); ?>)) {
                         ok = 1;
                     } else {
                         elem.focus();
@@ -730,7 +715,7 @@ function validate() {
             if (ename.indexOf('form_upay[0]') == 0) {//Today is this text box.
                 if (f.form_paytotal.value * 1 != elem.value * 1) {//Total CO-PAY is not posted against today
                 //A warning message, if the amount is posted against an old encounter.
-                    if (confirm("<?php echo addslashes(xl('You are posting against an old encounter?')) ?>")) {
+                    if (confirm(<?php echo xlj('You are posting against an old encounter?'); ?>)) {
                         ok = 1;
                     } else {
                         elem.focus();
@@ -747,7 +732,7 @@ function validate() {
             var ename = elem.name;
             if (ename.indexOf('form_upay[0') == 0) {
                 if (elem.value * 1 > 0) {
-                    alert("<?php echo addslashes(xl('Invoice Balance cannot be posted. No Encounter is created.')) ?>");
+                    alert(<?php echo xlj('Invoice Balance cannot be posted. No Encounter is created.'); ?>);
                     return false;
                 }
                 break;
@@ -755,7 +740,7 @@ function validate() {
         }
     }
     if (ok == -1) {
-        if (confirm("<?php echo addslashes(xl('Would you like to save?')) ?>")) {
+        if (confirm(<?php echo xlj('Would you like to save?'); ?>)) {
             return true;
         }
         else {
@@ -941,26 +926,43 @@ function make_insurance() {
 }
 </style>
 <title><?php echo xlt('Record Payment'); ?></title>
+    <?php $NameNew = $patdata['fname'] . " " . $patdata['lname'] . " " . $patdata['mname']; ?>
+    <?php
+    $arrOeUiSettings = array(
+    'heading_title' => xl('Accept Payment'),
+    'include_patient_name' => true,// use only in appropriate pages
+    'expandable' => false,
+    'expandable_files' => array(),//all file names need suffix _xpd
+    'action' => "",//conceal, reveal, search, reset, link or back
+    'action_title' => "",
+    'action_href' => "",//only for actions - reset, link or back
+    'show_help_icon' => false,
+    'help_file_name' => ""
+    );
+    $oemr_ui = new OemrUI($arrOeUiSettings);
+    ?>
 </head>
 <body>
-        <div class="container"><!--begin container div for form-->
-            <div class="row">
+    <div class="container"><!--begin container div for form-->
+        <div class="row">
+            <div class="col-sm-12">
                 <div class="page-header">
-                    <h2><?php echo xlt('Accept Payment for'); ?><?php echo " " . text($patdata['fname']) . " " .
-                            text($patdata['lname']) . " (" . text($patdata['pubpid']) . ")" ?></h2>
-                    <?php $NameNew = $patdata['fname'] . " " . $patdata['lname'] . " " . $patdata['mname']; ?>
+                    <?php echo  $oemr_ui->pageHeading() . "\r\n"; ?>
                 </div>
             </div>
-            <div class= "row">
-                <form method='post' action='front_payment.php<?php echo ($payid) ? "?payid=".attr($payid) : ""; ?>' onsubmit='return validate();'>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                <form method='post' action='front_payment.php<?php echo ($payid) ? "?payid=".attr_url($payid) : ""; ?>' onsubmit='return validate();'>
+                   <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
                    <input name='form_pid' type='hidden' value='<?php echo attr($pid) ?>'>
                     <fieldset>
                     <legend><?php echo xlt('Payment'); ?></legend>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
+                        <div class="col-12 oe-custom-line">
+                            <div class="col-3 offset-lg-3">
                                 <label class="control-label" for="form_method"><?php echo xlt('Payment Method'); ?>:</label>
                             </div>
-                            <div class="col-xs-3">
+                            <div class="col-3">
                                 <select class="form-control" id="form_method" name="form_method" onchange='CheckVisible("yes")'>
                                     <?php
                                     $query1112 = "SELECT * FROM list_options where list_id=?  ORDER BY seq, title ";
@@ -969,88 +971,88 @@ function make_insurance() {
                                         if ($brow1112['option_id']=='electronic' || $brow1112['option_id']=='bank_draft') {
                                             continue;
                                         }
-                                        echo "<option value='".attr($brow1112['option_id'])."'>".attr(xl_list_label($brow1112['title']))."</option>";
+                                        echo "<option value='".attr($brow1112['option_id'])."'>".text(xl_list_label($brow1112['title']))."</option>";
                                     }
                                     ?>
                                 </select>
                             </div>
                         </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
+                        <div class="col-12 oe-custom-line">
+                            <div class="col-3 offset-lg-3">
                                 <label class="control-label" for="check_number"><?php echo xlt('Check/Ref Number'); ?>:</label>
                             </div>
-                            <div class="col-xs-3">
+                            <div class="col-3">
                                 <div id="ajax_div_patient" style="display:none;"></div>
                                 <input type='text'  id="check_number" name='form_source' class= 'form-control' value='<?php echo attr($payrow['source']); ?>'>
                             </div>
                         </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
+                        <div class="col-12 oe-custom-line">
+                            <div class="col-3 offset-lg-3">
                                 <label class="control-label" for="form_discount"><?php echo xla('Patient Coverage'); ?>:</label>
                             </div>
-                            <div class="col-xs-6">
+                            <div class="col-6">
                                 <div style="padding-left:15px">
                                     <label class="radio-inline">
-                                      <input id="radio_type_of_coverage1" name="radio_type_of_coverage" onclick="make_visible_radio();make_self();" type="radio" value="self"><?php echo xla('Self'); ?>
+                                      <input id="radio_type_of_coverage1" name="radio_type_of_coverage" onclick="make_visible_radio();make_self();" type="radio" value="self"><?php echo xlt('Self'); ?>
                                     </label>
                                     <label class="radio-inline">
-                                      <input checked="checked" id="radio_type_of_coverag2" name="radio_type_of_coverage" onclick="make_hide_radio();make_insurance();" type="radio" value="insurance"><?php echo xla('Insurance'); ?>
+                                      <input checked="checked" id="radio_type_of_coverag2" name="radio_type_of_coverage" onclick="make_hide_radio();make_insurance();" type="radio" value="insurance"><?php echo xlt('Insurance'); ?>
                                     </label>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xs-12 oe-custom-line">
-                            <div class="col-xs-3 col-lg-offset-3">
+                        <div class="col-12 oe-custom-line">
+                            <div class="col-3 offset-lg-3">
                                 <label class="control-label" for=""><?php echo xlt('Payment against'); ?>:</label>
                             </div>
-                            <div class="col-xs-6">
+                            <div class="col-6">
                                 <div id="tr_radio1" style="padding-left:15px; display:none"><!-- For radio Insurance -->
                                     <label class="radio-inline">
-                                      <input id="radio_type_of_payment_self1" name="radio_type_of_payment" onclick="make_visible_row();make_it_hide_enc_pay();cursor_pointer();" type="radio" value="cash"><?php echo xla('Encounter Payment'); ?>
+                                      <input id="radio_type_of_payment_self1" name="radio_type_of_payment" onclick="make_visible_row();make_it_hide_enc_pay();cursor_pointer();" type="radio" value="cash"><?php echo xlt('Encounter Payment'); ?>
                                     </label>
                                 </div>
                                 <div id="tr_radio2" style="padding-left:15px"><!-- For radio self -->
                                     <label class="radio-inline">
-                                      <input checked="checked" id="radio_type_of_payment1" name="radio_type_of_payment" onclick="make_visible_row();cursor_pointer();" type="radio" value="copay"><?php echo xla('Co Pay'); ?>
+                                      <input checked="checked" id="radio_type_of_payment1" name="radio_type_of_payment" onclick="make_visible_row();cursor_pointer();" type="radio" value="copay"><?php echo xlt('Co Pay'); ?>
                                     </label>
                                     <label class="radio-inline">
-                                      <input id="radio_type_of_payment2" name="radio_type_of_payment" onclick="make_visible_row();" type="radio" value="invoice_balance"><?php echo xla('Invoice Balance'); ?><br>
+                                      <input id="radio_type_of_payment2" name="radio_type_of_payment" onclick="make_visible_row();" type="radio" value="invoice_balance"><?php echo xlt('Invoice Balance'); ?><br />
                                     </label>
                                     <label class="radio-inline">
-                                      <input id="radio_type_of_payment4" name="radio_type_of_payment" onclick="make_hide_row();" type="radio" value="pre_payment"><?php echo xla('Pre Pay'); ?>
+                                      <input id="radio_type_of_payment4" name="radio_type_of_payment" onclick="make_hide_row();" type="radio" value="pre_payment"><?php echo xlt('Pre Pay'); ?>
                                     </label>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xs-12 oe-custom-line">
+                        <div class="col-12 oe-custom-line">
                             <div id="table_display_prepayment" style="display:none">
-                                <div class="col-xs-3 col-lg-offset-3">
-                                    <label class="control-label" for="form_prepayment"><?php echo xla('Pre Payment'); ?>:</label>
+                                <div class="col-3 offset-lg-3">
+                                    <label class="control-label" for="form_prepayment"><?php echo xlt('Pre Payment'); ?>:</label>
                                 </div>
-                                <div class="col-xs-3">
+                                <div class="col-3">
                                     <input name='form_prepayment' id='form_prepayment'class='form-control' type='text' value =''>
                                 </div>
                             </div>
                         </div>
                     </fieldset>
                     <fieldset>
-                        <legend><?php echo xla('Collect For'); ?></legend>
+                        <legend><?php echo xlt('Collect For'); ?></legend>
                         <div class= "table-responsive">
                             <table class = "table" id="table_display">
                                 <thead>
                                     <tr bgcolor="#CCCCCC" id="tr_head">
-                                        <td class="dehead" width="70"><?php echo xla('DOS'); ?></td>
-                                        <td class="dehead" width="65"><?php echo xla('Encounter'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_total_charge" width="80"><?php echo xla('Total Charge'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_rep_doc" style='display:none' width="70"><?php echo xla('Report/ Form'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_description" style='display:none' width="200"><?php echo xla('Description'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_insurance_payment" width="80"><?php echo xla('Insurance Payment'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_patient_payment" width="80"><?php echo xla('Patient Payment'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_patient_co_pay" width="55"><?php echo xla('Co Pay Paid'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_co_pay" width="55"><?php echo xla('Required Co Pay'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_insurance_balance" width="80"><?php echo xla('Insurance Balance'); ?></td>
-                                        <td align="center" class="dehead" id="td_head_patient_balance" width="80"><?php echo xla('Patient Balance'); ?></td>
-                                        <td align="center" class="dehead" width="50"><?php echo xla('Paying'); ?></td>
+                                        <td class="dehead" width="70"><?php echo xlt('DOS'); ?></td>
+                                        <td class="dehead" width="65"><?php echo xlt('Encounter'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_total_charge" width="80"><?php echo xlt('Total Charge'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_rep_doc" style='display:none' width="70"><?php echo xlt('Report/ Form'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_description" style='display:none' width="200"><?php echo xlt('Description'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_insurance_payment" width="80"><?php echo xlt('Insurance Payment'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_patient_payment" width="80"><?php echo xlt('Patient Payment'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_patient_co_pay" width="55"><?php echo xlt('Co Pay Paid'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_co_pay" width="55"><?php echo xlt('Required Co Pay'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_insurance_balance" width="80"><?php echo xlt('Insurance Balance'); ?></td>
+                                        <td align="center" class="dehead" id="td_head_patient_balance" width="80"><?php echo xlt('Patient Balance'); ?></td>
+                                        <td align="center" class="dehead" width="50"><?php echo xlt('Paying'); ?></td>
                                     </tr>
                                 </thead>
                                 <?php
@@ -1159,8 +1161,8 @@ function make_insurance() {
                                         $gottoday = true;
                                     }
                                     //------------------------------------------------------------------------------------
-                                    $inscopay = getCopay($pid, $dispdate);
-                                    $patcopay = getPatientCopay($pid, $enc);
+                                    $inscopay = BillingUtilities::getCopay($pid, $dispdate);
+                                    $patcopay = BillingUtilities::getPatientCopay($pid, $enc);
                                     //Insurance Payment
                                     //-----------------
                                     $drow = sqlQuery(
@@ -1228,7 +1230,7 @@ function make_insurance() {
                                     <td class="dehead" id='td_total_6'></td>
                                     <td class="dehead" id='td_total_7'></td>
                                     <td class="dehead" id='td_total_8'></td>
-                                    <td align="right" class="dehead"><?php echo xla('Total');?></td>
+                                    <td align="right" class="dehead"><?php echo xlt('Total');?></td>
                                     <td align="right" class="dehead"><input name='form_paytotal' readonly style='color:#00aa00;width:50px' type='text' value=''></td>
                                 </tr>
                             </table>
@@ -1237,8 +1239,8 @@ function make_insurance() {
                     <div class="form-group">
                         <div class="col-sm-12 text-left position-override">
                             <div class="btn-group btn-group-pinch" role="group">
-                                <button type='submit' class="btn btn-default btn-save" name='form_save' value='<?php echo xlt('Generate Invoice');?>'><?php echo xla('Generate Invoice');?></button>
-                                <button type='button' class="btn btn-link btn-cancel btn-separate-left"  value='<?php echo xla('Cancel'); ?>' onclick='closeHow(event)'><?php echo xla('Cancel'); ?></button>
+                                <button type='submit' class="btn btn-secondary btn-save" name='form_save' value='<?php echo xla('Generate Invoice');?>'><?php echo xlt('Generate Invoice');?></button>
+                                <button type='button' class="btn btn-link btn-cancel btn-separate-left"  value='<?php echo xla('Cancel'); ?>' onclick='closeHow(event)'><?php echo xlt('Cancel'); ?></button>
                                 <input type="hidden" name="hidden_patient_code" id="hidden_patient_code" value="<?php echo attr($pid);?>"/>
                                 <input type='hidden' name='ajax_mode' id='ajax_mode' value='' />
                                 <input type='hidden' name='mode' id='mode' value='' />
@@ -1247,13 +1249,14 @@ function make_insurance() {
                     </div>
                 </form>
             </div>
-            <script language="JavaScript">
-            calctotal();
-            </script>
-        </center>
-        <?php
-}
-        ?>
+        </div>
+        <script language="JavaScript">
+        calctotal();
+        </script>
     </div><!--end of container div of accept payment i.e the form-->
+    <?php
+        $oemr_ui->oeBelowContainerDiv();
+} // forms else close
+?>
 </body>
 </html>

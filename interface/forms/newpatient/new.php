@@ -2,33 +2,23 @@
 /**
  * Encounter form new script.
  *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
- * @package OpenEMR
- * @author  Brady Miller <brady.g.miller@gmail.com>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
+require_once(__DIR__ . "/../../globals.php");
+require_once("$srcdir/lists.inc");
 
-
-include_once("../../globals.php");
-include_once("$srcdir/acl.inc");
-include_once("$srcdir/lists.inc");
+use OpenEMR\Common\Acl\AclMain;
 
 // Check permission to create encounters.
 $tmp = getPatientData($pid, "squad");
-if (($tmp['squad'] && ! acl_check('squads', $tmp['squad'])) ||
-  !acl_check_form('newpatient', '', array('write', 'addonly'))) {
+if (($tmp['squad'] && ! AclMain::aclCheckCore('squads', $tmp['squad'])) ||
+  !AclMain::aclCheckForm('newpatient', '', array('write', 'addonly'))) {
     echo "<body>\n<html>\n";
     echo "<p>(" . xlt('New encounters not authorized') . ")</p>\n";
     echo "</body>\n</html>\n";

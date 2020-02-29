@@ -6,23 +6,25 @@
  * @link      http://www.open-emr.org
  * @author    Rod Roark <rod@sunsetsystems.com>
  * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @author    Stephen Waite <stephen.waite@cmsvt.com>
  * @copyright Copyright (c) 2006-2010 Rod Roark <rod@sunsetsystems.com>
  * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2019-2020 Stephen Waite <stephen.waite@cmsvt.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
-
 
 // Buffer all output so we can archive it to a file.
 ob_start();
 
 require_once("../globals.php");
-require_once("$srcdir/invoice_summary.inc.php");
-require_once("$srcdir/sl_eob.inc.php");
-require_once("$srcdir/parse_era.inc.php");
-require_once("claim_status_codes.php");
-require_once("adjustment_reason_codes.php");
-require_once("remark_codes.php");
-require_once("$srcdir/billing.inc");
+
+use OpenEMR\Billing\BillingUtilities;
+use OpenEMR\Billing\InvoiceSummary;
+use OpenEMR\Billing\ParseERA;
+use OpenEMR\Billing\SLEOB;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+use OpenEMR\Services\InsuranceService;
 
 $debug = $_GET['debug'] ? 1 : 0; // set to 1 for debugging mode
 $paydate = parse_date($_GET['paydate']);
@@ -32,7 +34,7 @@ $last_ptname = '';
 $last_invnumber = '';
 $last_code = '';
 $invoice_total = 0.00;
-$InsertionId;//last inserted ID of
+$InsertionId; // last inserted ID of
 
 ///////////////////////// Assorted Functions /////////////////////////
 
@@ -146,8 +148,10 @@ function writeOldDetail(&$prev, $ptname, $invnumber, $dos, $code, $bgcolor)
     }
 }
 
-    // This is called back by parse_era() once per claim.
+    // This is called back by ParseERA::parse_era() once per claim.
     //
+
+// TODO: Sort colors here for Bootstrap themes
 function era_callback_check(&$out)
 {
     global $InsertionId;//last inserted ID of
@@ -155,8 +159,8 @@ function era_callback_check(&$out)
 
     if ($_GET['original']=='original') {
         $StringToEcho="<br/><br/><br/><br/><br/><br/>";
-        $StringToEcho.="<table border='1' cellpadding='0' cellspacing='0'  width='750'>";
-        $StringToEcho.="<tr bgcolor='#cccccc'><td width='50'></td><td class='dehead' width='150' align='center'>" . xlt('Check Number') . "</td><td class='dehead' width='400'  align='center'>" . xlt('Payee Name') . "</td><td class='dehead'  width='150' align='center'>" . xlt('Check Amount') . "</td></tr>";
+        $StringToEcho.="<table class='table table-bordered' cellpadding='0' cellspacing='0' width='750'>";
+        $StringToEcho.="<tr class='table-light'><td width='50'></td><td class='dehead' width='150' align='center'>" . xlt('Check Number') . "</td><td class='dehead' width='400' align='center'>" . xlt('Payee Name') . "</td><td class='dehead' width='150' align='center'>" . xlt('Check Amount') . "</td></tr>";
         $WarningFlag=false;
         for ($check_count=1; $check_count<=$out['check_count']; $check_count++) {
             if ($check_count%2==1) {
@@ -179,9 +183,9 @@ function era_callback_check(&$out)
             $StringToEcho.="</tr>";
         }
 
-        $StringToEcho.="<tr bgcolor='#cccccc'><td colspan='4' align='center'><input type='submit'  name='CheckSubmit' value='Submit'/></td></tr>";
+        $StringToEcho.="<tr class='table-light'><td colspan='4' align='center'><input type='submit' name='CheckSubmit' value='Submit'/></td></tr>";
         if ($WarningFlag==true) {
-            $StringToEcho.="<tr bgcolor='#ff0000'><td colspan='4' align='center'>" . xlt('Warning, Check Number already exist in the database') . "</td></tr>";
+            $StringToEcho.="<tr class='table-danger'><td colspan='4' align='center'>" . xlt('Warning, Check Number already exist in the database') . "</td></tr>";
         }
 
         $StringToEcho.="</table>";
@@ -193,14 +197,14 @@ function era_callback_check(&$out)
                 $check_date=$out['check_date'.$check_count]?$out['check_date'.$check_count]:$_REQUEST['paydate'];
                 $post_to_date=$_REQUEST['post_to_date']!=''?$_REQUEST['post_to_date']:date('Y-m-d');
                 $deposit_date=$_REQUEST['deposit_date']!=''?$_REQUEST['deposit_date']:date('Y-m-d');
-                $InsertionId[$out['check_number'.$check_count]]=arPostSession($_REQUEST['InsId'], $out['check_number'.$check_count], $out['check_date'.$check_count], $out['check_amount'.$check_count], $post_to_date, $deposit_date, $debug);
+                $InsertionId[$out['check_number'.$check_count]]=SLEOB::arPostSession($_REQUEST['InsId'], $out['check_number'.$check_count], $out['check_date'.$check_count], $out['check_amount'.$check_count], $post_to_date, $deposit_date, $debug);
             }
         }
     }
 }
 function era_callback(&$out)
 {
-    global $encount, $debug, $claim_status_codes, $adjustment_reasons, $remark_codes;
+    global $encount, $debug;
     global $invoice_total, $last_code, $paydate;
     global $InsertionId;//last inserted ID of
 
@@ -211,13 +215,13 @@ function era_callback(&$out)
     if (isset($_REQUEST['chk'.$chk_123])) {
         if ($encount == 0) {
             writeMessageLine(
-                '#ffffff',
+                'var(--white)',
                 'infdetail',
                 "Payer: " . $out['payer_name']
             );
             if ($debug) {
                 writeMessageLine(
-                    '#ffffff',
+                    'var(--white)',
                     'infdetail',
                     "WITHOUT UPDATE is selected; no changes will be applied."
                 );
@@ -227,7 +231,7 @@ function era_callback(&$out)
         $last_code = '';
         $invoice_total = 0.00;
         $bgcolor = (++$encount & 1) ? "#ddddff" : "#ffdddd";
-        list($pid, $encounter, $invnumber) = slInvoiceNumber($out);
+        list($pid, $encounter, $invnumber) = SLEOB::slInvoiceNumber($out);
 
         // Get details, if we have them, for the invoice.
         $inverror = true;
@@ -243,7 +247,7 @@ function era_callback(&$out)
                   $invnumber = $out['our_claim_id'];
             } else {
                   $inverror = false;
-                  $codes = ar_get_invoice_summary($pid, $encounter, true);
+                  $codes = InvoiceSummary::ar_get_invoice_summary($pid, $encounter, true);
                   // $svcdate = substr($ferow['date'], 0, 10);
             }
         }
@@ -267,7 +271,7 @@ function era_callback(&$out)
         writeMessageLine(
             $bgcolor,
             'infdetail',
-            "Claim status $csc: " . $claim_status_codes[$csc]
+            "Claim status $csc: " . BillingUtilities::claim_status_codes_CLP02[$csc]
         );
 
     // Show an error message if the claim is missing or already posted.
@@ -302,7 +306,7 @@ function era_callback(&$out)
                     $code_value = substr($code_value, 0, -1);
                     //We store the reason code to display it with description in the billing manager screen.
                     //process_file is used as for the denial case file name will not be there, and extra field(to store reason) can be avoided.
-                    updateClaim(true, $pid, $encounter, $_REQUEST['InsId'], substr($inslabel, 3), 7, 0, $code_value);
+                    BillingUtilities::updateClaim(true, $pid, $encounter, $_REQUEST['InsId'], substr($inslabel, 3), 7, 0, $code_value);
                 }
             }
 
@@ -329,7 +333,7 @@ function era_callback(&$out)
         $check_date      = $paydate ? $paydate : parse_date($out['check_date']);
         $production_date = $paydate ? $paydate : parse_date($out['production_date']);
 
-        $insurance_id = arGetPayerID($pid, $service_date, substr($inslabel, 3));
+        $insurance_id = SLEOB::arGetPayerID($pid, $service_date, substr($inslabel, 3));
         if (empty($ferow['lname'])) {
               $patient_name = $out['patient_fname'] . ' ' . $out['patient_lname'];
         } else {
@@ -379,14 +383,13 @@ function era_callback(&$out)
                 ****/
 
                 unset($codes[$codekey]);
-            } // If the service item is not in our database...
-            else {
+            } else { // If the service item is not in our database...
                 // This is not an error. If we are not in error mode and not debugging,
                 // insert the service item into SL.  Then display it (in green if it
                 // was inserted, or in red if we are in error mode).
                 $description = "CPT4:$codekey Added by $inslabel $production_date";
                 if (!$error && !$debug) {
-                    arPostCharge(
+                    SLEOB::arPostCharge(
                         $pid,
                         $encounter,
                         0,
@@ -447,7 +450,8 @@ function era_callback(&$out)
             // Report miscellaneous remarks.
             if ($svc['remark']) {
                 $rmk = $svc['remark'];
-                writeMessageLine($bgcolor, 'infdetail', "$rmk: " . $remark_codes[$rmk]);
+                writeMessageLine($bgcolor, 'infdetail', "$rmk: " .
+                    BillingUtilities::remittance_advice_remark_codes[$rmk]);
             }
 
             // Post and report the payment for this service item from the ERA.
@@ -455,7 +459,7 @@ function era_callback(&$out)
             // i.e. a payment reversal.
             if ($svc['paid']) {
                 if (!$error && !$debug) {
-                    arPostPayment(
+                    SLEOB::arPostPayment(
                         $pid,
                         $encounter,
                         $InsertionId[$out['check_number']],
@@ -491,7 +495,8 @@ function era_callback(&$out)
             // Post and report adjustments from this ERA.  Posted adjustment reasons
             // must be 25 characters or less in order to fit on patient statements.
             foreach ($svc['adj'] as $adj) {
-                $description = $adj['reason_code'] . ': ' . $adjustment_reasons[$adj['reason_code']];
+                $description = $adj['reason_code'] . ': ' .
+                    BillingUtilities::claim_adjustment_reason_codes[$adj['reason_code']];
                 if ($adj['group_code'] == 'PR' || !$primary) {
                     // Group code PR is Patient Responsibility.  Enter these as zero
                     // adjustments to retain the note without crediting the claim.
@@ -510,10 +515,9 @@ function era_callback(&$out)
                         } else if ($adj['reason_code'] == '3') {
                             $reason = "$inslabel copay: ";
                         }
-                    } // Non-primary insurance adjustments are garbage, either repeating
-                    // the primary or are not adjustments at all.  Report them as notes
-                    // but do not post any amounts.
-                    else {
+                    } else { // Non-primary insurance adjustments are garbage, either repeating
+                        // the primary or are not adjustments at all.  Report them as notes
+                        // but do not post any amounts.
                         $reason = "$inslabel note " . $adj['reason_code'] . ': ';
                 /****
                     $reason .= sprintf("%.2f", $adj['amount']);
@@ -523,7 +527,7 @@ function era_callback(&$out)
                     $reason .= sprintf("%.2f", $adj['amount']);
                     // Post a zero-dollar adjustment just to save it as a comment.
                     if (!$error && !$debug) {
-                        arPostAdjustment(
+                        SLEOB::arPostAdjustment(
                             $pid,
                             $encounter,
                             $InsertionId[$out['check_number']],
@@ -539,10 +543,9 @@ function era_callback(&$out)
 
                     writeMessageLine($bgcolor, $class, $description . ' ' .
                     sprintf("%.2f", $adj['amount']));
-                } // Other group codes for primary insurance are real adjustments.
-                else {
+                } else { // Other group codes for primary insurance are real adjustments.
                     if (!$error && !$debug) {
-                        arPostAdjustment(
+                        SLEOB::arPostAdjustment(
                             $pid,
                             $encounter,
                             $InsertionId[$out['check_number']],
@@ -611,14 +614,40 @@ function era_callback(&$out)
             }
 
             // Check for secondary insurance.
-            if ($primary && arGetPayerID($pid, $service_date, 2)) {
-                arSetupSecondary($pid, $encounter, $debug, $out['crossover']);
+            if ($primary && SLEOB::arGetPayerID($pid, $service_date, 2)) {
+                SLEOB::arSetupSecondary($pid, $encounter, $debug, $out['crossover']);
 
                 if ($out['crossover']<>1) {
                     writeMessageLine(
                         $bgcolor,
                         'infdetail',
                         'This claim is now re-queued for secondary paper billing'
+                    );
+                }
+            }
+
+            if ($out['corrected'] == '1') {
+                if ($GLOBALS['update_mbi']) {
+                    if ($primary && (substr($inslabel, 3) == 1)) {
+                        $updated_ins = InsuranceService::getOne($pid, "primary");
+                        $updated_ins['provider'] = $insurance_id;
+                        $updated_ins['policy_number'] = $out['corrected_mbi'];
+                        InsuranceService::update($pid, "primary", $updated_ins);
+                    } else { // tbd secondary medicare
+                        // InsuranceService::update($pid, "secondary", array($insurance_id, '', $out['corrected_mbi']));
+                        // will need to add method to insurance service to return policy type
+                    }
+
+                    writeMessageLine(
+                        $bgcolor,
+                        'infdetail',
+                        "The policy number has been updated to " . $out['corrected_mbi']
+                    );
+                } else {
+                    writeMessageLine(
+                        $bgcolor,
+                        'infdetail',
+                        "The policy number could be updated to " . $out['corrected_mbi'] . " if you enable it in globals"
                     );
                 }
             }
@@ -630,8 +659,8 @@ function era_callback(&$out)
 
 $info_msg = "";
 
-if (!verifyCsrfToken($_GET["csrf_token_form"])) {
-    csrfNotVerified();
+if (!CsrfUtils::verifyCsrfToken($_GET["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
 }
 
 $eraname = $_GET['eraname'];
@@ -645,7 +674,7 @@ if (! $eraname) {
     // report files.  Do not save the report if this is a no-update situation.
     //
 if (!$debug) {
-    $nameprefix = $GLOBALS['OE_SITE_DIR'] . "/era/$eraname";
+    $nameprefix = $GLOBALS['OE_SITE_DIR'] . "/documents/era/$eraname";
     $namesuffix = '';
     for ($i = 1; is_file("$nameprefix$namesuffix.html"); ++$i) {
         $namesuffix = "_$i";
@@ -661,34 +690,58 @@ if (!$debug) {
 ?>
 <html>
 <head>
-<?php html_header_show();?>
-<link rel=stylesheet href="<?php echo $css_header;?>" type="text/css">
-<style type="text/css">
- body       { font-family:sans-serif; font-size:8pt; font-weight:normal }
- .dehead    { color:#000000; font-family:sans-serif; font-size:9pt; font-weight:bold }
- .olddetail { color:#000000; font-family:sans-serif; font-size:9pt; font-weight:normal }
- .newdetail { color:#00dd00; font-family:sans-serif; font-size:9pt; font-weight:normal }
- .errdetail { color:#dd0000; font-family:sans-serif; font-size:9pt; font-weight:normal }
- .infdetail { color:#0000ff; font-family:sans-serif; font-size:9pt; font-weight:normal }
+<?php Header::setupHeader(); ?>
+<style>
+    body {
+        font-family: sans-serif;
+        font-size: 0.6875rem;
+        font-weight: normal;
+    }
+    .dehead {
+        font-family: sans-serif;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    .olddetail {
+        font-family: sans-serif;
+        font-size: 0.75rem;
+        font-weight: normal;
+    }
+    .newdetail {
+        color: var(--success);
+        font-family: sans-serif;
+        font-size: 0.75rem;
+        font-weight: normal;
+    }
+    .errdetail {
+        color: var(--danger);
+        font-family: sans-serif;
+        font-size: 0.75rem;
+        font-weight: normal;
+    }
+    .infdetail {
+        color: var(--primary);
+        font-family: sans-serif;
+        font-size: 0.75rem;
+        font-weight: normal;
+    }
 </style>
-<title><?php echo xlt('EOB Posting - Electronic Remittances')?></title>
-<script language="JavaScript">
-</script>
+<title><?php echo xlt('EOB Posting - Electronic Remittances'); ?></title>
 </head>
-<body leftmargin='0' topmargin='0' marginwidth='0' marginheight='0'>
-<form action="sl_eob_process.php" method="get" >
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<body class='m-0'>
+<form action="sl_eob_process.php" method="get">
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <center>
 <?php
 if ($_GET['original']=='original') {
-    $alertmsg = parse_era_for_check($GLOBALS['OE_SITE_DIR'] . "/era/$eraname.edi", 'era_callback');
+    $alertmsg = ParseERA::parse_era_for_check($GLOBALS['OE_SITE_DIR'] . "/documents/era/$eraname.edi", 'era_callback');
     echo $StringToEcho;
 } else {
     ?>
-    <table border='0' cellpadding='2' cellspacing='0' width='100%'>
+    <table class='table table-borderless w-100' cellpadding='2' cellspacing='0'>
 
-     <tr bgcolor="#cccccc">
+     <tr class="table-light">
       <td class="dehead">
     <?php echo xlt('Patient'); ?>
       </td>
@@ -716,8 +769,8 @@ if ($_GET['original']=='original') {
     global $InsertionId;
 
     $eraname=$_REQUEST['eraname'];
-    $alertmsg = parse_era_for_check($GLOBALS['OE_SITE_DIR'] . "/era/$eraname.edi");
-    $alertmsg = parse_era($GLOBALS['OE_SITE_DIR'] . "/era/$eraname.edi", 'era_callback');
+    $alertmsg = ParseERA::parse_era_for_check($GLOBALS['OE_SITE_DIR'] . "/documents/era/$eraname.edi");
+    $alertmsg = ParseERA::parse_era($GLOBALS['OE_SITE_DIR'] . "/documents/era/$eraname.edi", 'era_callback');
     if (!$debug) {
           $StringIssue=xl("Total Distribution for following check number is not full").': ';
           $StringPrint='No';
@@ -736,21 +789,21 @@ if ($_GET['original']=='original') {
         }
 
         if ($StringPrint=='Yes') {
-            echo "<script>alert('" . addslashes($StringIssue) . "')</script>";
+            echo "<script>alert(" . js_escape($StringIssue) . ")</script>";
         }
     }
 
 
     ?>
     </table>
-<?php
+    <?php
 }
 ?>
 </center>
-<script language="JavaScript">
+<script>
 <?php
 if ($alertmsg) {
-    echo " alert('" . addslashes($alertmsg) . "');\n";
+    echo " alert(" . js_escape($alertmsg) . ");\n";
 }
 ?>
 </script>

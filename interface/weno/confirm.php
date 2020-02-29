@@ -2,16 +2,20 @@
 /**
  * weno rx confirm
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Sherwin Gaddis <sherwingaddis@gmail.com>
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Sherwin Gaddis <sherwingaddis@gmail.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2016-2017 Sherwin Gaddis <sherwingaddis@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
  * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
 require_once('../globals.php');
 require_once("$srcdir/patient.inc");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 use OpenEMR\Rx\Weno\TransmitData;
 
@@ -25,7 +29,6 @@ $send = $tData->getDrugList($pid, $date);
 $provider = $tData->getProviderFacility($uid);
 $patientPharmacy = $tData->patientPharmacyInfo($pid);
 $mailOrder = $tData->mailOrderPharmacy();
-
 
 ?>
 
@@ -50,7 +53,7 @@ $mailOrder = $tData->mailOrderPharmacy();
 
 <h2><?php print xlt("Prescription Transmit Review"); ?></h2>
 <div class="table-responsive text-center" style="margin-left:10%;width:75%;">
-<table class="table table-condensed table-striped">
+<table class="table table-sm table-striped">
     <thead>
         <th class='text-center'><?php print xlt("Drug"); ?></th>
         <th class='text-center'><?php print xlt("Quantity"); ?></th>
@@ -69,32 +72,32 @@ $mailOrder = $tData->mailOrderPharmacy();
 </table>
 </div>
 <?php if (empty($drug)) {
-    echo "<br> <p class='text-danger'><strong> ".xlt("No prescriptions selected"). "</strong></p>";
+    echo "<br /> <p class='text-danger'><strong> ".xlt("No prescriptions selected"). "</strong></p>";
     exit;
 }
 ?>
 <div id="fields">
     <h3><?php echo xlt("Select Pharmacy"); ?></h3>
-    <?php echo xlt("Patient Default"); ?> <br>
+    <?php echo xlt("Patient Default"); ?> <br />
     <input type = 'radio' name = "pharmacy" id = 'patientPharmacy' value="<?php print attr($patientPharmacy['pharmacy_id']) ?>" checked="checked">
     <?php
     if (!$patientPharmacy['name']) {
-        print "<b>".xlt("Please set pharmacy in patient\'s chart!")."</b><br> <br>";
+        print "<b>".xlt("Please set pharmacy in patient\'s chart!")."</b><br /> <br />";
     } else {
         print text($patientPharmacy['name']);
     }
-    ?><br> <br>
+    ?><br /> <br />
 
-    <?php print xlt("Mail Order") ?> <br>
-    <input type = 'radio' name = 'pharmacy' id = 'mailOrder' value = "<?php print attr($mailOrder['id']) ?>"><?php print "CCS Medical 	14255 49th Street, North, Clearwater, FL 33762 <br>" ?>
+    <?php print xlt("Mail Order") ?> <br />
+    <input type = 'radio' name = 'pharmacy' id = 'mailOrder' value = "<?php print attr($mailOrder['id']) ?>"><?php print "CCS Medical 	14255 49th Street, North, Clearwater, FL 33762 <br />" ?>
 
     <div id="confirm" show>
-        <br><br>
+        <br /><br />
         <input type='submit' id='confirm_btn' value='<?php print xla("Approve Order"); ?>' >
     </div>
 
     <div id="transmit" hidden>
-        <br><br>
+        <br /><br />
         <input type='submit' id='order' value='<?php print xla("Transmit Order"); ?>' >
     </div>
     <div id="success"></div>
@@ -103,7 +106,7 @@ $mailOrder = $tData->mailOrderPharmacy();
 <script type="text/javascript">
 
 
-    $(document).ready(function(){
+    $(function(){
 
 
         var toTran = <?php echo json_encode($drug); ?>; //pass php array to jquery script
@@ -130,7 +133,7 @@ $mailOrder = $tData->mailOrderPharmacy();
             $("#confirm").toggle();
 
             //this is to set the pharmacy for the presciption(s)
-            $.ajax({ url: 'markTx.php?arr='+pharm_Id+','+toTran });
+            $.ajax({ url: 'markTx.php?arr=' + encodeURIComponent(pharm_Id) + ',' + encodeURIComponent(toTran) + '&csrf_token_form=' + <?php echo js_url(CsrfUtils::collectCsrfToken()); ?> });
 
             //Makes the returned ajax call a global variable
             function getReturnJson(x){
@@ -144,7 +147,7 @@ $mailOrder = $tData->mailOrderPharmacy();
                 //this is to create the json script to be transmitted
                 $.ajax({
                     //feeds the json generator
-                    url: 'jsonScript.php?getJson='+pharm_Id+','+value,
+                    url: 'jsonScript.php?getJson=' + encodeURIComponent(pharm_Id) + ',' + encodeURIComponent(value) + '&csrf_token_form=' + <?php echo js_url(CsrfUtils::collectCsrfToken()); ?>,
 
                     success: function(response){
                         console.log(response);
@@ -195,7 +198,7 @@ $mailOrder = $tData->mailOrderPharmacy();
             // a done event to present results to user in one shot.
             $.when.apply(null, request).done(function() {
                 // all done with our requests, lets announce what weno says.
-                var announce = '<?php echo xlt("Send Complete - Prescription(s) Return Status");?>';
+                var announce = <?php echo xlj("Send Complete - Prescription(s) Return Status");?>;
                 $('#success').html('<p><h4 class="bg-info">' + announce + '</h4></p>');
                 $.each(responses, function (index, response) {
                     console.log('result: ' + response);
@@ -208,9 +211,9 @@ $mailOrder = $tData->mailOrderPharmacy();
     }); //end of doc ready
 
 </script>
-<br>
-<br>
-<br>
+<br />
+<br />
+<br />
 
 <footer>
     <p><?php print xlt("Open Med Practice and its suppliers use their commercially reasonable efforts to provide the most current and complete data available to them concerning prescription histories, drug interactions and formularies, patient allergies and other factors, but by your use of this service you acknowledge that (1) the completeness and accuracy of such data depends upon the completeness and accuracy with which it is entered into connected electronic databases by physicians, physician’s offices, pharmaceutical benefits managers, electronic medical records firms, and other network participants, (2) such data is subject to error or omission in input, storage or retrieval, transmission and display, technical disruption, power or service outages, or other interruptions in electronic communication, any or all of which may be beyond the control of Open Med Practice and its suppliers, and (3) some information may be unavailable due to regulatory, contractual, privacy or other legal restrictions. You are responsible to use your clinical judgment at all times in rendering medical service and advice."); ?></p>

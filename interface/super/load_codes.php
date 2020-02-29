@@ -2,31 +2,26 @@
 /**
  * Upload and install a designated code set to the codes table.
  *
- * Copyright (C) 2014 Rod Roark <rod@sunsetsystems.com>
- *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
- * @package OpenEMR
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2014 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
 
 set_time_limit(0);
 
 require_once('../globals.php');
-require_once($GLOBALS['srcdir'] . '/acl.inc');
 require_once($GLOBALS['fileroot'] . '/custom/code_types.inc.php');
 
-if (!acl_check('admin', 'super')) {
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
+if (!AclMain::aclCheckCore('admin', 'super')) {
     die(xlt('Not authorized'));
 }
 
@@ -37,11 +32,11 @@ $code_type = empty($_POST['form_code_type']) ? '' : $_POST['form_code_type'];
 
 <head>
 <title><?php echo xlt('Install Code Set'); ?></title>
-<link rel="stylesheet" href='<?php echo $css_header ?>' type='text/css'>
+<?php Header::setupHeader(); ?>
 
 <style type="text/css">
- .dehead { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:bold }
- .detail { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:normal }
+ .dehead { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:bold }
+ .detail { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:normal }
 </style>
 
 </head>
@@ -52,8 +47,8 @@ $code_type = empty($_POST['form_code_type']) ? '' : $_POST['form_code_type'];
 // Handle uploads.
 if (!empty($_POST['bn_upload'])) {
     //verify csrf
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     if (empty($code_types[$code_type])) {
@@ -153,15 +148,15 @@ if (!empty($_POST['bn_upload'])) {
     }
 
     echo "<p style='color:green'>" .
-       xlt('LOAD SUCCESSFUL. Codes inserted') . ": $inscount, " .
-       xlt('replaced') . ": $repcount" .
+       xlt('LOAD SUCCESSFUL. Codes inserted') . ": " . text($inscount) . ", " .
+       xlt('replaced') . ": " . text($repcount) .
        "</p>\n";
 }
 
 ?>
 <form method='post' action='load_codes.php' enctype='multipart/form-data'
  onsubmit='return top.restoreSession()'>
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <center>
 
@@ -218,7 +213,7 @@ foreach (array('RXCUI') as $codetype) {
 <!-- No translation because this text is long and US-specific and quotes other English-only text. -->
 <p class='text'>
 <b>RXCUI codes</b> may be downloaded from
-<a href='http://www.nlm.nih.gov/research/umls/rxnorm/docs/rxnormfiles.html' target='_blank'>
+<a href='https://www.nlm.nih.gov/research/umls/rxnorm/docs/rxnormfiles.html' rel="noopener" target='_blank'>
 www.nlm.nih.gov/research/umls/rxnorm/docs/rxnormfiles.html</a>.
 Get the "Current Prescribable Content Monthly Release" zip file, marked "no license required".
 Then you can upload that file as-is here, or extract the file RXNCONSO.RRF from it and upload just

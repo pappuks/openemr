@@ -12,6 +12,8 @@ require_once("$srcdir/forms.inc");
 require_once("$srcdir/options.inc.php");
 require_once("$srcdir/patient.inc");
 
+use OpenEMR\Core\Header;
+
 $CPR = 4; // cells per row
 
 $pprow = array();
@@ -34,8 +36,7 @@ function end_row()
     global $cell_count, $CPR;
     end_cell();
     if ($cell_count > 0) {
-        for (; $cell_count < $CPR;
-        ++$cell_count) {
+        for (; $cell_count < $CPR; ++$cell_count) {
             echo "<td></td>";
         }
 
@@ -60,6 +61,7 @@ $formid = $_GET['id'];
 //
 if ($_POST['bn_save']) {
     $sets = "";
+    $sqlBindArray= array();
     $fres = sqlStatement("SELECT * FROM layout_options " .
     "WHERE form_id = 'SRH' AND uor > 0 AND field_id != '' AND " .
     "edit_options != 'H' " .
@@ -71,17 +73,19 @@ if ($_POST['bn_save']) {
             $sets .= ", ";
         }
 
-        $sets .= "$field_id = '" . add_escape_custom($value) . "'";
+        $sets .= escape_sql_column_name($field_id, array('form_ippf_srh')) . " = ?";
+        array_push($sqlBindArray, $value);
     }
 
     if ($formid) {
         // Updating an existing form.
-        $query = "UPDATE form_ippf_srh SET $sets WHERE id = '$formid'";
-        sqlStatement($query);
+        $query = "UPDATE form_ippf_srh SET " . $sets . " WHERE id = ?";
+        array_push($sqlBindArray, $formid);
+        sqlStatement($query, $sqlBindArray);
     } else {
         // Adding a new form.
-        $query = "INSERT INTO form_ippf_srh SET $sets";
-        $newid = sqlInsert($query);
+        $query = "INSERT INTO form_ippf_srh SET " . $sets;
+        $newid = sqlInsert($query, $sqlBindArray);
         addForm($encounter, "IPPF SRH Data", $newid, "ippf_srh", $pid, $userauthorized);
     }
 
@@ -93,19 +97,18 @@ if ($_POST['bn_save']) {
 
 $enrow = sqlQuery("SELECT p.fname, p.mname, p.lname, fe.date FROM " .
   "form_encounter AS fe, forms AS f, patient_data AS p WHERE " .
-  "p.pid = '$pid' AND f.pid = '$pid' AND f.encounter = '$encounter' AND " .
+  "p.pid = ? AND f.pid = ? AND f.encounter = ? AND " .
   "f.formdir = 'newpatient' AND f.deleted = 0 AND " .
-  "fe.id = f.form_id LIMIT 1");
+  "fe.id = f.form_id LIMIT 1", array($pid, $pid, $encounter));
 
 if ($formid) {
     $pprow = sqlQuery("SELECT * FROM form_ippf_srh WHERE " .
-    "id = '$formid' AND activity = '1'");
+    "id = ? AND activity = '1'", array($formid));
 }
 ?>
 <html>
 <head>
-<?php html_header_show();?>
-<link rel=stylesheet href="<?php echo $css_header;?>" type="text/css">
+    <?php Header::setupHeader(); ?>
 <style>
 
 td, input, select, textarea {
@@ -122,8 +125,6 @@ div.section {
 }
 
 </style>
-
-<script type="text/javascript" src="../../../library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
 
 <script language="JavaScript">
 
@@ -142,14 +143,14 @@ function divclick(cb, divid) {
 </head>
 
 <body <?php echo $top_bg_line; ?> topmargin="0" rightmargin="0" leftmargin="2" bottommargin="0" marginwidth="2" marginheight="0">
-<form method="post" action="<?php echo $rootdir ?>/forms/ippf_srh/new.php?id=<?php echo $formid ?>"
+<form method="post" action="<?php echo $rootdir ?>/forms/ippf_srh/new.php?id=<?php echo attr_url($formid); ?>"
  onsubmit="return top.restoreSession()">
 
 <p class='title' style='margin-top:8px;margin-bottom:8px;text-align:center'>
 <?php
-  echo xl('IPPF SRH Data for') . ' ';
-  echo $enrow['fname'] . ' ' . $enrow['mname'] . ' ' . $enrow['lname'];
-  echo ' ' . xl('on') . ' ' . substr($enrow['date'], 0, 10);
+  echo xlt('IPPF SRH Data for') . ' ';
+  echo text($enrow['fname']) . ' ' . text($enrow['mname']) . ' ' . text($enrow['lname']);
+  echo ' ' . xlt('on') . ' ' . text(substr($enrow['date'], 0, 10));
 ?>
 </p>
 
@@ -193,14 +194,14 @@ while ($frow = sqlFetchArray($fres)) {
             $group_seq  = 'srh' . substr($this_group, 0, 1);
             $group_name = substr($this_group, 1);
             $last_group = $this_group;
-            echo "<br /><span class='bold'><input type='checkbox' name='form_cb_$group_seq' value='1' " .
-        "onclick='return divclick(this,\"div_$group_seq\");'";
+            echo "<br /><span class='bold'><input type='checkbox' name='form_cb_" . attr($group_seq) . "' value='1' " .
+        "onclick='return divclick(this," . attr_js("div_".$group_seq) . ");'";
         if ($display_style == 'block') {
             echo " checked";
         }
 
-            echo " /><b>$group_name</b></span>\n";
-            echo "<div id='div_$group_seq' class='section' style='display:$display_style;'>\n";
+            echo " /><b>" . text($group_name) . "</b></span>\n";
+            echo "<div id='div_" . attr($group_seq) . "' class='section' style='display:" . attr($display_style) . ";'>\n";
             echo " <table border='0' cellpadding='0' width='100%'>\n";
             $display_style = 'none';
     }
@@ -218,7 +219,7 @@ while ($frow = sqlFetchArray($fres)) {
 // Handle starting of a new label cell.
     if ($titlecols > 0) {
             end_cell();
-            echo "<td valign='top' colspan='$titlecols' width='1%' nowrap";
+            echo "<td valign='top' colspan='" . attr($titlecols) . "' width='1%' nowrap";
             echo ($frow['uor'] == 2) ? " class='required'" : " class='bold'";
         if ($cell_count == 2) {
             echo " style='padding-left:10pt'";
@@ -232,7 +233,7 @@ while ($frow = sqlFetchArray($fres)) {
 
     echo "<b>";
     if ($frow['title']) {
-        echo $frow['title'] . ":";
+        echo text($frow['title']) . ":";
     } else {
         echo "&nbsp;";
     }
@@ -242,7 +243,7 @@ while ($frow = sqlFetchArray($fres)) {
 // Handle starting of a new data cell.
     if ($datacols > 0) {
             end_cell();
-            echo "<td valign='top' colspan='$datacols' class='text'";
+            echo "<td valign='top' colspan='" . attr($datacols) . "' class='text'";
         if ($cell_count > 0) {
             echo " style='padding-left:5pt'";
         }

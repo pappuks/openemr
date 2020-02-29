@@ -15,9 +15,14 @@ require_once("$srcdir/patient.inc");
 require_once("$srcdir/options.inc.php");
 require_once("$srcdir/report_database.inc");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+use OpenEMR\Events\PatientSelect\PatientSelectFilterEvent;
+use OpenEMR\Events\BoundFilter;
+
 if (!empty($_REQUEST)) {
-    if (!verifyCsrfToken($_REQUEST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_REQUEST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 }
 
@@ -30,81 +35,102 @@ $from_page = isset($_REQUEST['from_page']) ? $_REQUEST['from_page'] : "";
 <!DOCTYPE html>
 <html>
 <head>
-<?php html_header_show();?>
-<script type="text/javascript" src="<?php echo $webroot ?>/interface/main/tabs/js/include_opener.js"></script>
-
-<link rel=stylesheet href="<?php echo $css_header;?>" type="text/css">
+    <?php Header::setupHeader('opener'); ?>
 <style>
 form {
     padding: 0px;
     margin: 0px;
 }
+
 #searchCriteria {
     text-align: center;
     width: 100%;
-    font-size: 0.8em;
-    background-color: #ddddff;
+    font-size: 0.8rem;
+    background-color: var(--gray300);
     font-weight: bold;
     padding: 3px;
 }
+
 #searchResultsHeader {
     width: 100%;
-    background-color: lightgrey;
+    background-color: var(--gray);
 }
+
 #searchResultsHeader table {
     width: 96%;  /* not 100% because the 'searchResults' table has a scrollbar */
     border-collapse: collapse;
 }
+
 #searchResultsHeader th {
-    font-size: 0.7em;
+    font-size: 0.7rem;
 }
+
 #searchResults {
     width: 100%;
     height: 80%;
     overflow: auto;
 }
 
-.srName { width: 12%; }
-.srGender { width: 5%; }
-.srPhone { width: 11%; }
-.srSS { width: 11%; }
-.srDOB { width: 8%; }
-.srID { width: 7%; }
-.srPID { width: 7%; }
-.srNumEnc { width: 11%; }
-.srNumDays { width: 11%; }
-.srDateLast { width: 11%; }
-.srDateNext { width: 11%; }
-.srMisc { width: 10%; }
+.srName {
+    width: 12%;
+}
+
+.srGender { 
+    width: 5%;
+}
+
+.srDOB {
+    width: 8%;
+}
+
+.srID,
+.srPID {
+    width: 7%;
+}
+
+.srNumEnc,
+.srNumDays,
+.srDateLast,
+.srDateNext,
+.srPhone,
+.srSS {
+    width: 11%;
+}
+
+.srMisc {
+    width: 10%;
+}
 
 #searchResults table {
     width: 100%;
     border-collapse: collapse;
-    background-color: white;
+    background-color: var(--white);
 }
+
 #searchResults tr {
-    cursor: hand;
     cursor: pointer;
 }
+
 #searchResults td {
-    font-size: 0.7em;
-    border-bottom: 1px solid #eee;
+    font-size: 0.7rem;
+    border-bottom: 1px solid var(--gray200);
 }
-.oneResult { }
-.billing { color: red; font-weight: bold; }
+
+.billing {
+    color: var(--danger);
+    font-weight: bold;
+}
 .highlight {
-    background-color: #336699;
-    color: white;
+    background-color: var(--primary);
+    color: var(--white);
 }
 </style>
 
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery/dist/jquery.min.js"></script>
-
 <?php if ($popup) { ?>
-<script type="text/javascript" src="../../../library/topdialog.js"></script>
+    <?php Header::setupAssets('topdialog'); ?>
 <?php } ?>
 
-<script language="JavaScript">
+<script>
 <?php if ($popup) {
     require($GLOBALS['srcdir'] . "/restoreSession.php");
 } ?>
@@ -125,7 +151,7 @@ function submitList(offset) {
 <body class="body_top">
 
 <form method='post' action='patient_select.php' name='theform' onsubmit='return top.restoreSession()'>
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <input type='hidden' name='fstart'  value='<?php echo attr($fstart); ?>' />
 
@@ -193,6 +219,19 @@ if ($popup) {
         array_push($sqlBindArray, $search_service_code);
     }
 
+    // Custom filtering which enables module developer to filter patients out of search
+    $patientSelectFilterEvent = new PatientSelectFilterEvent(new BoundFilter());
+    $patientSelectFilterEvent = $GLOBALS["kernel"]->getEventDispatcher()->dispatch(PatientSelectFilterEvent::EVENT_HANDLE, $patientSelectFilterEvent, 10);
+    $boundFilter = $patientSelectFilterEvent->getBoundFilter();
+    $sqlBindArray = array_merge($boundFilter->getBoundValues(), $sqlBindArray);
+    $customWhere = $boundFilter->getFilterClause();
+
+    if (empty($where)) {
+        $where = $customWhere;
+    } else {
+        $where = "$customWhere AND $where";
+    }
+
     $sql = "SELECT $given FROM patient_data " .
     "WHERE $where ORDER BY $orderby LIMIT " . escape_limit($fstart) . ", " . escape_limit($sqllimit);
 
@@ -202,7 +241,7 @@ if ($popup) {
         $result[] = $row;
     }
 
-    _set_patient_inc_count($sqllimit, count($result), $where, $sqlBindArray);
+    _set_patient_inc_count($sqllimit, count($result), "$customWhere AND $where", $sqlBindArray);
 } else if ($from_page == "cdr_report") {
   // Collect setting from cdr report
     echo "<input type='hidden' name='from_page' value='" . attr($from_page) . "' />\n";
@@ -265,23 +304,23 @@ if ($popup) {
 
 </form>
 
-<table border='0' cellpadding='5' cellspacing='0' width='100%'>
+<table class="w-100 border-0" cellpadding='5' cellspacing='0'>
  <tr>
   <td class='text'>
     <?php if ($from_page == "cdr_report") { ?>
-   <a href='../../reports/cqm.php?report_id=<?php echo attr(urlencode($report_id)); ?>' class='css_button' onclick='top.restoreSession()'><span><?php echo xlt("Return To Report Results"); ?></span></a>
+   <a href='../../reports/cqm.php?report_id=<?php echo attr_url($report_id); ?>' class='btn btn-secondary' onclick='top.restoreSession()'><span><?php echo xlt("Return To Report Results"); ?></span></a>
     <?php } else { ?>
-   <a href="./patient_select_help.php" target=_new onclick='top.restoreSession()'>[<?php echo xlt('Help'); ?>]&nbsp</a>
+   <a href="./patient_select_help.php" target=_new onclick='top.restoreSession()'>[<?php echo xlt('Help'); ?>]&nbsp;</a>
     <?php } ?>
   </td>
   <td class='text' align='center'>
 <?php if ($message) {
-    echo "<font color='red'><b>" . text($message) . "</b></font>\n";
+    echo "<span class='text-danger'>" . text($message) . "</span>\n";
 } ?>
   </td>
   <td>
     <?php if ($from_page == "cdr_report") { ?>
-    <?php echo "<a href='patient_select.php?from_page=cdr_report&pass_id=" . attr(urlencode($pass_id)) . "&report_id=" . attr(urlencode($report_id)) . "&itemized_test_id=" . attr(urlencode($itemized_test_id)) . "&numerator_label=" . attr(urlencode($row['numerator_label'])) . "&print_patients=1&csrf_token_form=" . attr(urlencode(collectCsrfToken())) . "' class='css_button' onclick='top.restoreSession()'><span>" . xlt("Print Entire Listing") . "</span></a>"; ?>
+        <?php echo "<a href='patient_select.php?from_page=cdr_report&pass_id=" . attr_url($pass_id) . "&report_id=" . attr_url($report_id) . "&itemized_test_id=" . attr_url($itemized_test_id) . "&numerator_label=" . attr_url($row['numerator_label']) . "&print_patients=1&csrf_token_form=" . attr_url(CsrfUtils::collectCsrfToken()) . "' class='btn btn-primary' onclick='top.restoreSession()'><span>" . xlt("Print Entire Listing") . "</span></a>"; ?>
     <?php } ?> &nbsp;
   </td>
   <td class='text' align='right'>
@@ -316,7 +355,7 @@ if ($fend > $count) {
  <tr>
     <?php if ($from_page == "cdr_report") {
         echo "<td colspan='6' class='text'>";
-        echo "<b>";
+        echo "<strong>";
         if ($pass_id == "fail") {
              echo xlt("Failed Patients");
         } else if ($pass_id == "pass") {
@@ -327,11 +366,11 @@ if ($fend > $count) {
              echo xlt("All Patients");
         }
 
-        echo "</b>";
+        echo "</strong>";
         echo " - ";
         echo collectItemizedRuleDisplayTitle($report_id, $itemized_test_id, $numerator_label);
         echo "</td>";
-} ?>
+    } ?>
  </tr>
 </table>
 
@@ -351,17 +390,17 @@ if ($fend > $count) {
 <th class="srNumDays"><?php echo xlt('[Days Since Last Encounter]'); ?></th>
 <th class="srDateLast"><?php echo xlt('[Date of Last Encounter]'); ?></th>
 <th class="srDateNext">
-<?php
-$add_days = 90;
-if (!$popup && preg_match('/^(\d+)\s*(.*)/', $patient, $matches) > 0) {
-    $add_days = $matches[1];
-    $patient = $matches[2];
-}
-?>
+    <?php
+    $add_days = 90;
+    if (!$popup && preg_match('/^(\d+)\s*(.*)/', $patient, $matches) > 0) {
+        $add_days = $matches[1];
+        $patient = $matches[2];
+    }
+    ?>
 [<?php echo attr($add_days);?> <?php echo xlt('Days From Last Encounter'); ?>]
 </th>
 
-<?php
+    <?php
 } else {
   // Alternate patient search results style; this gets address plus other
   // fields that are mandatory, up to a limit of 5.
@@ -399,18 +438,18 @@ if ($result) {
         echo  "<td class='srGender'>" . text(getListItemTitle("sex", $iter['sex'])) . "</td>\n";
         //other phone number display setup for tooltip
         $phone_biz = '';
-        if ($iter{"phone_biz"} != "") {
-            $phone_biz = " [business phone ".$iter{"phone_biz"}."] ";
+        if ($iter["phone_biz"] != "") {
+            $phone_biz = " [business phone ".$iter["phone_biz"]."] ";
         }
 
         $phone_contact = '';
-        if ($iter{"phone_contact"} != "") {
-            $phone_contact = " [contact phone ".$iter{"phone_contact"}."] ";
+        if ($iter["phone_contact"] != "") {
+            $phone_contact = " [contact phone ".$iter["phone_contact"]."] ";
         }
 
         $phone_cell = '';
-        if ($iter{"phone_cell"} != "") {
-            $phone_cell = " [cell phone ".$iter{"phone_cell"}."] ";
+        if ($iter["phone_cell"] != "") {
+            $phone_cell = " [cell phone ".$iter["phone_cell"]."] ";
         }
 
         $all_other_phones = $phone_biz.$phone_contact.$phone_cell;
@@ -423,7 +462,7 @@ if ($result) {
             text($iter['phone_home']) . "</td>\n";
 
         echo "<td class='srSS'>" . text($iter['ss']) . "</td>";
-        if ($iter{"DOB"} != "0000-00-00 00:00:00") {
+        if ($iter["DOB"] != "0000-00-00 00:00:00") {
             echo "<td class='srDOB'>" . text(oeFormatShortDate($iter['DOB'])) . "</td>";
         } else {
             echo "<td class='srDOB'>&nbsp;</td>";
@@ -453,7 +492,7 @@ if ($result) {
                   "billing.pid = form_encounter.pid and billing.activity = 1 and " .
                   "billing.code_type not like 'COPAY' where ".
                   "form_encounter.pid = ?";
-            $statement= sqlStatement($query, array($iter{"pid"}));
+            $statement= sqlStatement($query, array($iter["pid"]));
             if ($results = sqlFetchArray($statement)) {
                 $last_date_seen = $results['mydate'];
                 $day_diff = $results['day_diff'];
@@ -469,7 +508,7 @@ if ($result) {
                   escape_limit($add_days) .
                   " day) as next_appt_day from form_encounter " .
                   " where form_encounter.pid = ?";
-            $statement= sqlStatement($query, array($iter{"pid"}));
+            $statement= sqlStatement($query, array($iter["pid"]));
             if ($results = sqlFetchArray($statement)) {
                 $last_date_seen = $results['mydate'];
                 $day_diff = $results['day_diff'];
@@ -482,7 +521,7 @@ if ($result) {
                    " from billing ".
                    " where code_type not like 'COPAY' and activity = 1 " .
                    " and pid = ?";
-            $statement= sqlStatement($query, array($iter{"pid"}));
+            $statement= sqlStatement($query, array($iter["pid"]));
             if ($results = sqlFetchArray($statement)) {
                 $encounter_count_billed = $results['encounter_count'];
             }
@@ -491,7 +530,7 @@ if ($result) {
             $query = "select count(date) as encounter_count ".
                       " from form_encounter where ".
                       " pid = ?";
-            $statement= sqlStatement($query, array($iter{"pid"}));
+            $statement= sqlStatement($query, array($iter["pid"]));
             if ($results = sqlFetchArray($statement)) {
                 $encounter_count = $results['encounter_count'];
             }
@@ -514,11 +553,11 @@ if ($result) {
 </table>
 </div>  <!-- end searchResults DIV -->
 
-<script language="javascript">
+<script>
 
 // jQuery stuff to make the page a little easier to use
 
-$(document).ready(function(){
+$(function (){
     // $("#searchparm").focus();
     $(".oneresult").mouseover(function() { $(this).addClass("highlight"); });
     $(".oneresult").mouseout(function() { $(this).removeClass("highlight"); });

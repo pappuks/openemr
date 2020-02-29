@@ -18,7 +18,9 @@ require_once("$srcdir/options.inc.php");
 require_once("$srcdir/amc.php");
 require_once("$srcdir/patient.inc");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
+use OpenEMR\OeUI\OemrUI;
 
 // This can come from the URL if it's an Add.
 $title   = empty($_REQUEST['title']) ? 'LBTref' : $_REQUEST['title'];
@@ -40,6 +42,10 @@ $grparr = array();
 getLayoutProperties($form_id, $grparr);
 
 if ($mode) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+
     $sets = "title = ?, user = ?, groupname = ?, authorized = ?, date = NOW()";
     $sqlBindArray = array($form_id, $_SESSION['authUser'], $_SESSION['authProvider'], $userauthorized);
 
@@ -118,8 +124,7 @@ function end_row()
     global $cell_count, $CPR;
     end_cell();
     if ($cell_count > 0) {
-        for (; $cell_count < $CPR;
-        ++$cell_count) {
+        for (; $cell_count < $CPR; ++$cell_count) {
             echo "<td></td>";
         }
 
@@ -151,7 +156,7 @@ $trow = $transid ? getTransById($transid) : array();
 <?php include_once("{$GLOBALS['srcdir']}/options.js.php"); ?>
 
 <script type="text/javascript">
-$(document).ready(function() {
+$(function() {
   if(window.tabbify){
     tabbify();
   }
@@ -160,9 +165,9 @@ $(document).ready(function() {
   }
 });
 
-var mypcc = '<?php echo htmlspecialchars($GLOBALS['phone_country_code'], ENT_QUOTES); ?>';
+var mypcc = <?php echo js_escape($GLOBALS['phone_country_code']); ?>;
 
-$(document).ready(function(){
+$(function(){
   $("#send_sum_flag").click(function() {
     if ( $('#send_sum_flag').prop('checked') ) {
       // Enable the send_sum_elec_flag checkbox
@@ -195,7 +200,7 @@ function titleChanged() {
  var sel = document.forms[0].title;
  // Layouts must not interfere with each other. Reload the document in Add mode.
  top.restoreSession();
- location.href = 'add_transaction.php?title=' + sel.value;
+ location.href = 'add_transaction.php?title=' + encodeURIComponent(sel.value);
  return true;
 }
 
@@ -238,7 +243,7 @@ function sel_related(e) {
 // Process click on $view link.
 function deleteme() {
 // onclick='return deleteme()'
- dlgopen('../deleter.php?transaction=<?php echo htmlspecialchars($transid, ENT_QUOTES); ?>', '_blank', 500, 450);
+ dlgopen('../deleter.php?transaction=' + <?php echo js_url($transid); ?> + '&csrf_token_form=' + <?php echo js_url(CsrfUtils::collectCsrfToken()); ?>, '_blank', 500, 450);
  return false;
 }
 
@@ -266,11 +271,11 @@ function validate(f) {
     <?php generate_layout_validation($form_id); ?>
 
  var msg = "";
- msg += "<?php echo xla('The following fields are required'); ?>:\n\n";
+ msg += <?php echo xlj('The following fields are required'); ?> + ":\n\n";
  for ( var i = 0; i < errMsgs.length; i++ ) {
     msg += errMsgs[i] + "\n";
  }
- msg += "\n<?php echo xla('Please fill them in before continuing.'); ?>";
+ msg += "\n" + <?php echo xlj('Please fill them in before continuing.'); ?>;
 
  if ( errMsgs.length > 0 ) {
     alert(msg);
@@ -304,25 +309,36 @@ div.tab {
     width: auto;
 }
 </style>
+<?php
+$arrOeUiSettings = array(
+    'heading_title' => xl('Add/Edit Patient Transaction'),
+    'include_patient_name' => true,
+    'expandable' => false,
+    'expandable_files' => array(),//all file names need suffix _xpd
+    'action' => "back",//conceal, reveal, search, reset, link or back
+    'action_title' => "",
+    'action_href' => "transactions.php",//only for actions - reset, link and back
+    'show_help_icon' => true,
+    'help_file_name' => "add_edit_transactions_dashboard_help.php"
+);
+$oemr_ui = new OemrUI($arrOeUiSettings);
+?>
 
 </head>
 <body class="body_top" onload="<?php echo $body_onload_code; ?>" >
-    <div class="container">
-        <form name='new_transaction' method='post' action='add_transaction.php?transid=<?php echo attr($transid); ?>' onsubmit='return validate(this)'>
+    <div id="container_div" class="<?php echo $oemr_ui->oeContainer();?>">
+        <form name='new_transaction' method='post' action='add_transaction.php?transid=<?php echo attr_url($transid); ?>' onsubmit='return validate(this)'>
+        <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
         <input type='hidden' name='mode' value='add'>
-            <?php $header_title = xl('Add/Edit Patient Transaction of');?>
             <div class="row">
                 <div class="col-sm-12">
-                    <?php
-                        $go_back_href = "transactions.php";
-                        require_once("../summary/dashboard_header_simple_return.php");
-                    ?>
+                    <?php require_once("$include_root/patient_file/summary/dashboard_header.php"); ?>
                 </div>
             </div>
             <div class="row">
                 <div class="col-sm-12">
                     <div class="btn-group">
-                        <a href="#" class="btn btn-default btn-save" onclick="submitme();">
+                        <a href="#" class="btn btn-secondary btn-save" onclick="submitme();">
                             <?php echo xlt('Save'); ?>
                         </a>
                         <a href="transactions.php" class="btn btn-link btn-cancel" onclick="top.restoreSession()">
@@ -331,8 +347,8 @@ div.tab {
                     </div>
                 </div>
             </div>
-            <br>
-            <br>
+            <br />
+            <br />
             <div class="row">
                 <div class="col-sm-12">
                     <fieldset>
@@ -372,7 +388,7 @@ div.tab {
                                             <input type="checkbox" id="send_sum_flag" name="send_sum_flag">
                                         <?php } ?>
 
-                                        <span class="text"><?php echo xlt('Sent Summary of Care?') ?></span><br>
+                                        <span class="text"><?php echo xlt('Sent Summary of Care?') ?></span><br />
 
                                         <?php if (!(empty($itemAMC)) && !(empty($itemAMC_elec))) { ?>
                                             &nbsp;&nbsp;<input type="checkbox" id="send_sum_elec_flag" name="send_sum_elec_flag" checked>
@@ -382,18 +398,18 @@ div.tab {
                                             &nbsp;&nbsp;<input type="checkbox" id="send_sum_elec_flag" name="send_sum_elec_flag" disabled>
                                         <?php } ?>
 
-                                        <span class="text"><?php echo xlt('Sent Summary of Care Electronically?') ?></span><br>
+                                        <span class="text"><?php echo xlt('Sent Summary of Care Electronically?') ?></span><br />
 
                                     </div>
                                 </div>
-                            <?php
+                                <?php
                             } ?>
                         </div>
                     </fieldset>
                 </div>
             </div>
             <div id='referdiv'>
-                
+
 
                 <div id="DEM">
                     <ul class="tabNav">
@@ -415,11 +431,8 @@ div.tab {
                                 } else {
                                     echo "<li class=''>";
                                 }
-
-                                $group_seq_esc = attr($group_seq);
-                                $group_name_show = text(xl_layout_label($group_name));
-                                echo "<a href='#' id='div_$group_seq_esc'>" .
-                                "$group_name_show</a></li>";
+                                echo "<a href='#' id='div_" . attr($group_seq) . "'>" .
+                                text(xl_layout_label($group_name)) . "</a></li>";
                             }
                         }
                         ?>
@@ -471,11 +484,10 @@ div.tab {
                                 $group_seq  = substr($this_group, 0, 1);
                                 $group_name = $grparr[$this_group]['grp_title'];
                                 $last_group = $this_group;
-                                $group_seq_esc = attr($group_seq);
                                 if ($group_seq == 1) {
-                                    echo "<div class='tab current' id='div_$group_seq_esc'>";
+                                    echo "<div class='tab current' id='div_" . attr($group_seq) . "'>";
                                 } else {
-                                    echo "<div class='tab' id='div_$group_seq_esc'>";
+                                    echo "<div class='tab' id='div_" . attr($group_seq) . "'>";
                                 }
 
                                 echo " <table border='0' cellpadding='0'>\n";
@@ -495,8 +507,7 @@ div.tab {
                             // Handle starting of a new label cell.
                             if ($titlecols > 0) {
                                 end_cell();
-                                $titlecols_esc = attr($titlecols);
-                                echo "<td width='70' valign='top' colspan='$titlecols_esc'";
+                                echo "<td width='70' valign='top' colspan='" . attr($titlecols) . "'";
                                 echo ($frow['uor'] == 2) ? " class='required'" : " class='bold'";
                                 if ($cell_count == 2) {
                                     echo " style='padding-left:10pt'";
@@ -524,8 +535,7 @@ div.tab {
                             // Handle starting of a new data cell.
                             if ($datacols > 0) {
                                 end_cell();
-                                $datacols_esc = attr($datacols);
-                                echo "<td valign='top' colspan='$datacols_esc' class='text'";
+                                echo "<td valign='top' colspan='" . attr($datacols) . "' class='text'";
                                 // This ID is used by action conditions.
                                 echo " id='value_id_" . attr($field_id) . "'";
                                 if ($cell_count > 0) {
@@ -552,15 +562,7 @@ div.tab {
         <!-- include support for the list-add selectbox feature -->
         <?php include $GLOBALS['fileroot']."/library/options_listadd.inc"; ?>
     </div> <!--end of container div-->
-    <?php
-    //home of the help modal ;)
-    //$GLOBALS['enable_help'] = 0; // Please comment out line if you want help modal to function on this page
-    if ($GLOBALS['enable_help'] == 1) {
-        echo "<script>var helpFile = 'add_edit_transactions_dashboard_help.php'</script>";
-        //help_modal.php lives in interface, set path accordingly
-        require "../../help_modal.php";
-    }
-    ?>
+    <?php $oemr_ui->oeBelowContainerDiv();?>
 </body>
 
 <script language="JavaScript">

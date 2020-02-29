@@ -1,25 +1,15 @@
 <?php
-
 /**
  * interface/eRxXMLBuilder.php Functions for building NewCrop XML.
  *
- * Copyright (C) 2015 Sam Likins <sam.likins@wsi-services.com>
- *
- * LICENSE: This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 3 of the License, or (at your option) any
- * later version.  This program is distributed in the hope that it will be
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
- * Public License for more details.  You should have received a copy of the GNU
- * General Public License along with this program.
- * If not, see <http://opensource.org/licenses/gpl-license.php>.
- *
- * @package    OpenEMR
- * @subpackage NewCrop
- * @author     Sam Likins <sam.likins@wsi-services.com>
- * @link       http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Sam Likins <sam.likins@wsi-services.com>
+ * @author    Ken Chapple <ken@mi-squared.com>
+ * @copyright Copyright (c) 2015 Sam Likins <sam.likins@wsi-services.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
 
 class eRxXMLBuilder
 {
@@ -237,7 +227,7 @@ class eRxXMLBuilder
         if (is_a($element, 'DOMNode') && is_array($children) && count($children)) {
             foreach ($children as $child) {
                 // if(is_array($child)) {
-                // 	$this->appendChildren($element, $child);
+                //  $this->appendChildren($element, $child);
                 // }
                 $element->appendChild($child);
             }
@@ -462,7 +452,7 @@ class eRxXMLBuilder
 
         $element = $this->getDocument()->createElement('LicensedPrescriber');
         $element->setAttribute('ID', $userDetails['npi']);
-        $element->appendChild($this->getLicensedPrescriberName($userDetails));
+        $element->appendChild($this->getLicensedPrescriberName($userDetails, xl('Licensed Prescriber')));
         $element->appendChild($this->createElementTextFieldEmpty('dea', $userDetails['federaldrugid'], 'Licensed Prescriber DEA'));
         if ($userDetails['upin']) {
             $element->appendChild($this->createElementText('upin', $userDetails['upin']));
@@ -543,6 +533,7 @@ class eRxXMLBuilder
         }
 
         $element->appendChild($this->createElementText('licenseNumber', $userDetails['state_license_number']));
+        $element->appendChild($this->createElementTextFieldEmpty('npi', $userDetails['npi'], xl('Midlevel Prescriber NPI')));
 
         return $element;
     }
@@ -644,6 +635,25 @@ class eRxXMLBuilder
             $element->appendChild($this->createElementText('gender', substr($patient['sex'], 0, 1)));
         }
 
+        $vitals = $this->getStore()->getPatientVitalsByPatientId($patient['pid']);
+        $age = getPatientAgeYMD($patient['date_of_birth']);
+
+        if ($vitals['height'] &&
+            $vitals['height_units']) {
+            $element->appendChild($this->createElementText('height', $vitals['height']));
+            $element->appendChild($this->createElementText('heightUnits', $vitals['height_units']));
+        } else if ($age['age'] < 19) {
+            $this->warningMessage('', xl('Patient Height Vital is required under age 19'));
+        }
+
+        if ($vitals['weight'] &&
+            $vitals['weight_units']) {
+            $element->appendChild($this->createElementText('weight', $vitals['weight']));
+            $element->appendChild($this->createElementText('weightUnits', $vitals['weight_units']));
+        } else if ($age['age'] < 19) {
+            $this->warningMessage('', xl('Patient Weight Vital is required under age 19'));
+        }
+
         return $element;
     }
 
@@ -656,7 +666,7 @@ class eRxXMLBuilder
 
         while ($healthplan = sqlFetchArray($healthplans)) {
             $element = $this->getDocument()->createElement('PatientFreeformHealthplans');
-            $element->appendChild($this->createElementText('healthplanName', $this->trimData($this->stripSpecialCharacter($healthplan['name'], 35))));
+            $element->appendChild($this->createElementText('healthplanName', $this->trimData($this->stripSpecialCharacter($healthplan['name']), 35)));
 
             $elements[] = $element;
         }
@@ -742,7 +752,7 @@ class eRxXMLBuilder
                     'doctorName'        => $prescription['docname'],
                     'drug'              => $this->trimData($this->stripSpecialCharacter($prescription['drug']), 80),
                     'dispenseNumber'    => intval($prescription['quantity']),
-                    'sig'               => $this->trimData($this->stripSpecialCharacter($prescription['quantity'][1].$prescription['size'].' '.$prescription['title4'].' '.$prescription['dosage'].' In '.$prescription['title1'].' '.$prescription['title2'].' '.$prescription['title3'], 140)),
+                    'sig'               => $this->trimData($this->stripSpecialCharacter($prescription['quantity'][1].$prescription['size'].' '.$prescription['title4'].' '.$prescription['dosage'].' In '.$prescription['title1'].' '.$prescription['title2'].' '.$prescription['title3']), 140),
                     'refillCount'       => intval($prescription['per_refill']),
                     'prescriptionType'  => 'reconcile'
                 ));

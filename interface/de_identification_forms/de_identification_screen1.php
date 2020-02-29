@@ -7,17 +7,21 @@
  * @author    ViCarePlus, Visolve <vicareplus_engg@visolve.com>
  * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2010 ViCarePlus, Visolve <vicareplus_engg@visolve.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2019 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
 
 require_once("../globals.php");
 require_once("$srcdir/lists.inc");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/acl.inc");
 require_once("$srcdir/options.inc.php");
 
-if (!acl_check('admin', 'super')) {
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
+if (!AclMain::aclCheckCore('admin', 'super')) {
     die(xlt('Not authorized'));
 }
 
@@ -26,12 +30,7 @@ if (!acl_check('admin', 'super')) {
 <html>
 <head>
 <title><?php echo xlt('De Identification'); ?></title>
-<link rel="stylesheet" href='<?php echo $css_header ?>' type='text/css'>
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.min.css">
-
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery/dist/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
+    <?php Header::setupHeader('datetime-picker'); ?>
 <style type="text/css">
 .style1 {
     text-align: center;
@@ -198,7 +197,7 @@ function form_validate()
 {
  if(document.forms[0].begin_date.value >= document.forms[0].end_date.value)
  {
-  alert("<?php echo xls('End date should be greater than Begin date');?>");
+  alert(<?php echo xlj('End date should be greater than Begin date'); ?>);
   return false;
  }
 
@@ -211,41 +210,37 @@ function form_validate()
  document.forms[0].billing_data.checked == false &&
  document.forms[0].insurance_data.checked == false)
  {
-  alert("<?php echo xls('Select Data Required for De Identification');?>");
+  alert(<?php echo xlj('Select Data Required for De Identification'); ?>);
   return false;
  }
 
  if(document.forms[0].diagnosis_text.value == "undefined" || document.forms[0].diagnosis_text.value == "")
  {
-  alert("<?php echo xls('Select Diagnosis for De Identification request');?>");
+  alert(<?php echo xlj('Select Diagnosis for De Identification request'); ?>);
   return false;
  }
  if(document.forms[0].drug_text.value == "undefined" || document.forms[0].drug_text.value == "")
  {
-  alert("<?php echo xls('Select Drugs for De Identification request');?>");
+  alert(<?php echo xlj('Select Drugs for De Identification request'); ?>);
   return false;
  }
  if(document.forms[0].immunization_text.value == "undefined" || document.forms[0].immunization_text.value == "")
  {
-  alert("<?php echo xls('Select Immunizations for De Identification request');?>");
+  alert(<?php echo xlj('Select Immunizations for De Identification request'); ?>);
   return false;
  }
- alert("<?php echo xls('De Identification process is started and running in background');
-    echo '\n';
-    echo xls('Please visit the screen after some time');?>");
+ alert(<?php echo xlj('De Identification process is started and running in background'); ?> + '\n' + <?php echo xlj('Please visit the screen after some time'); ?>);
  top.restoreSession();
  return true;
 }
 
 function download_file()
 {
- alert("<?php echo xls('De-identification files will be saved in');
-    echo ' `' . addslashes($GLOBALS['temporary_files_dir']) . '` ';
-    echo xls('location of the openemr machine and may contain sensitive data, so it is recommended to manually delete the files after its use');?>");
+ alert(<?php echo xlj('De-identification files will be saved in'); ?> + ' `' + <?php echo js_escape($GLOBALS['temporary_files_dir']); ?> + '` ' + <?php echo xlj('location of the openemr machine and may contain sensitive data, so it is recommended to manually delete the files after its use'); ?>);
  document.de_identification.submit();
 }
 
-$(document).ready(function(){
+$(function(){
     $('.datepicker').datetimepicker({
         <?php $datetimepicker_timepicker = false; ?>
         <?php $datetimepicker_showseconds = false; ?>
@@ -259,7 +254,7 @@ $(document).ready(function(){
 </head>
 <body class="body_top">
 <form name="de_identification" id="de_identification" action="de_identification_screen2.php" method="post" onsubmit="return form_validate();">
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 <strong><?php echo xlt('De Identification'); ?></strong>
 <?php
  $row = sqlQuery("SHOW TABLES LIKE 'de_identification_status'");
@@ -272,11 +267,11 @@ if (empty($row)) {
     <tr valign="top">
        <td>&nbsp;</td>
        <td rowspan="3">
-       <br>
+       <br />
         <?php echo xlt('Please upgrade OpenEMR Database to include De Identification procedures, function, tables'); ?>
-    </br></br><a  target="Blank" href="../../contrib/util/de_identification_upgrade.php"><?php echo xlt('Click here');?></a>
+    <br /><br /><a  target="Blank" href="../../contrib/util/de_identification_upgrade.php"><?php echo xlt('Click here');?></a>
     <?php echo xlt('to run');
-      echo " de_identification_upgrade.php</br>";?><br>
+      echo " de_identification_upgrade.php<br />";?><br />
         </td>
         <td>&nbsp;</td>
     </tr>
@@ -313,11 +308,11 @@ if (empty($row)) {
     <tr valign="top">
         <td>&nbsp;</td>
         <td rowspan="3">
-        <br>
+        <br />
         <?php echo xlt('De Identification Process is ongoing');
-          echo "</br></br>";
+          echo "<br /><br />";
           echo xlt('Please visit De Identification screen after some time');
-        echo "</br>";   ?>      <br>
+        echo "<br />";   ?>      <br />
            </td>
            <td>&nbsp;</td>
        </tr>
@@ -336,14 +331,14 @@ if (empty($row)) {
         $query = "SELECT count(*) as count FROM de_identified_data ";
         $res = sqlStatement($query);
         if ($row = sqlFetchArray($res)) {
-            $no_of_items = addslashes($row['count']);
+            $no_of_items = $row['count'];
         }
 
         if ($no_of_items <= 1) {
        //start new search - no patient record fount
             $query = "update de_identification_status set status = 0";
             $res = sqlStatement($query);
-        ?>
+            ?>
        <table>  <tr>  <td>&nbsp;</td> <td>&nbsp;</td> </tr>
           <tr>  <td>&nbsp;</td> <td>&nbsp;</td> </tr>
    </table>
@@ -352,11 +347,11 @@ if (empty($row)) {
 
         <td>&nbsp;</td>
         <td rowspan="3">
-        <br>
-        <?php echo xlt('No Patient record found for given Selection criteria');
-        echo "</br></br>";
-        echo xlt('Please start new De Identification process');
-        echo "</br>"; ?> </br>
+        <br />
+            <?php echo xlt('No Patient record found for given Selection criteria');
+            echo "<br /><br />";
+            echo xlt('Please start new De Identification process');
+            echo "<br />"; ?> <br />
           </td>
           <td>&nbsp;</td>
       </tr>
@@ -368,9 +363,9 @@ if (empty($row)) {
       <table align="center">
       <tr> <td>&nbsp;</td> <td>&nbsp;</td> </tr>
         </table>
-        <?php
+            <?php
         } else {
-    ?>
+            ?>
     <table>  <tr>  <td>&nbsp;</td> <td>&nbsp;</td> </tr>
           <tr>  <td>&nbsp;</td> <td>&nbsp;</td> </tr>
     </table>
@@ -378,11 +373,11 @@ if (empty($row)) {
         <tr valign="top">
         <td>&nbsp;</td>
         <td rowspan="3">
-        <br>
-        <?php echo xlt('De Identification Process is completed');
-        echo "</br></br>";
-        echo xlt('Please Click download button to download the De Identified data');
-        echo "</br>";    ?>      <br>
+        <br />
+            <?php echo xlt('De Identification Process is completed');
+            echo "<br /><br />";
+            echo xlt('Please Click download button to download the De Identified data');
+            echo "<br />";    ?>      <br />
            </td>
            <td>&nbsp;</td>
        </tr>
@@ -396,7 +391,7 @@ if (empty($row)) {
            <input type="button" name="Download" value=<?php echo xla("Download");?> onclick="download_file()" ></td>
       </tr>
       </table>
-    <?php
+            <?php
         }
     } else if ($deIdentificationStatus == 3) {
         //3 - The De Identification process completed with error
@@ -408,13 +403,13 @@ if (empty($row)) {
         <tr valign="top">
         <td>&nbsp;</td>
         <td rowspan="3">
-        <br>
+        <br />
         <?php echo xlt('Some error has occured during De Identification Process');
-          echo "</br></br>";
+          echo "<br /><br />";
           echo xlt('De Identified data may not be complete');
-          echo "</br></br>";
-            ?><span class="text"><?php echo xlt('Please view De Identification error log table for more details');
-    echo "</br>";   ?></span>   <br>
+          echo "<br /><br />";
+        ?><span class="text"><?php echo xlt('Please view De Identification error log table for more details');
+    echo "<br />";   ?></span>   <br />
            </td>
            <td>&nbsp;</td>
        </tr>
@@ -469,7 +464,7 @@ if (empty($row)) {
                 <input type="checkbox" name="prescriptions" id="prescriptions" value="prescriptions"><span class="text"><?php echo xlt('Prescriptions'); ?></span>
 
   &nbsp;</td>     <br />
-                <td><br>
+                <td><br />
                 <input type="checkbox" name="lists" id="lists" value="lists"><span class="text"><?php echo xlt('Issues'); ?> </span><br />
                 <input type="checkbox" name="transactions" id="transactions" value="transactions"><span class="text"><?php echo xlt('Transactions'); ?></span>
                 <br />
@@ -484,7 +479,7 @@ if (empty($row)) {
     </tr>
     <tr>
         <td>&nbsp;</td>
-        <td colspan="2"><br>
+        <td colspan="2"><br />
         </td>
         <td>&nbsp;</td>
     </tr>
@@ -505,7 +500,7 @@ if (empty($row)) {
                 <!--drugs--><span class="text"><?php echo xlt('Enter Drugs'); ?></span>
                 <input type="radio" id="drugs" name="drugs" value="all"); onclick="disable_controls('drugs')"/><span class="text"> <?php echo xlt('All'); ?></span>
                 <input type="radio" id="drugs" name="drugs" value="select_drug" onclick="enable_controls('drugs')" />
-                <span class="text"><?php echo xlt('Select Drugs'); ?> <br></span>
+                <span class="text"><?php echo xlt('Select Drugs'); ?> <br /></span>
                 <select id="drug_list" name="drug_list" size="10" style="width: 60%">
                 </select>
 
@@ -524,16 +519,16 @@ if (empty($row)) {
     <tr>
         <td>&nbsp;</td>
         <td colspan="2" class="style1">
-        <!--immunizations--><br>
+        <!--immunizations--><br />
         <span class="text"><?php echo xlt('Enter Immunizations'); ?></span>
         <input type="radio" id="immunizations" name="immunizations" value="all" onclick="disable_controls('immunizations')"/><span class="text"> <?php echo xlt('All'); ?></span>
         <input type="radio" id="immunizations" name="immunizations" value="select_immunization" onclick="enable_controls('immunizations')" />
-        <span class="text"><?php echo xlt('Select Immunizations'); ?></span> <br>
+        <span class="text"><?php echo xlt('Select Immunizations'); ?></span> <br />
         <select id="immunization_list" name="immunization_list" size="10" width="300" style="width: 30%">
-        </select> <br>
+        </select> <br />
         <input type="button" name="add_immunization" id="add_immunization" value="<?php echo xla("Add Immunization"); ?>" onclick="get_values('immunizations')">
         <input type="button" name="remove_immunization" id="remove_immunization" value="<?php echo xla("Remove"); ?>" onclick="remove_selected('immunizations')">
-        <br>
+        <br />
   &nbsp;</td>
         <td>&nbsp;</td>
     </tr>
@@ -544,15 +539,15 @@ if (empty($row)) {
         <td>&nbsp;</td>
     </tr>
 
-    <input type="hidden" name="diagnosis_text" id="diagnosis_text"><br>
-        <input type="hidden" name="drug_text" id="drug_text"><br>
+    <input type="hidden" name="diagnosis_text" id="diagnosis_text"><br />
+        <input type="hidden" name="drug_text" id="drug_text"><br />
         <input type="hidden" name="immunization_text" id="immunization_text">
   </table>
-    <?php
+        <?php
     }
 }
 
-    ?>
+?>
 </form>
 </body>
 </html>

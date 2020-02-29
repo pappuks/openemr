@@ -8,19 +8,28 @@
  * @author    Rod Roark <rod@sunsetsystems.com>
  * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2008-2015 Rod Roark <rod@sunsetsystems.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2018 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
-include_once("../globals.php");
-include_once("../../library/patient.inc");
-include_once("../../library/acl.inc");
 
+require_once("../globals.php");
+require_once("../../library/patient.inc");
+
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 use OpenEMR\Services\FacilityService;
+
+if (!empty($_POST)) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+}
 
 // Might want something different here.
 //
-if (! acl_check('acct', 'rep')) {
+if (!AclMain::aclCheckCore('acct', 'rep')) {
     die("Unauthorized access.");
 }
 
@@ -28,8 +37,9 @@ $facilityService = new FacilityService();
 
 $report_type = empty($_GET['t']) ? 'i' : $_GET['t'];
 
-$from_date     = fixDate($_POST['form_from_date']);
-$to_date       = fixDate($_POST['form_to_date'], date('Y-m-d'));
+$from_date = (isset($_POST['form_from_date'])) ? DateToYYYYMMDD($_POST['form_from_date']) : '0000-00-00';
+$to_date   = (isset($_POST['form_to_date'])) ? DateToYYYYMMDD($_POST['form_to_date']) : date('Y-m-d');
+
 $form_by       = $_POST['form_by'];     // this is a scalar
 $form_show     = $_POST['form_show'];   // this is an array
 $form_facility = isset($_POST['form_facility']) ? $_POST['form_facility'] : '';
@@ -186,27 +196,10 @@ function genEndRow()
     }
 }
 
-/*********************************************************************
-function genAnyCell($data, $right=false, $class='') {
-  global $cellcount;
-  if ($_POST['form_csvexport']) {
-    if ($cellcount) echo ',';
-    echo '"' . $data . '"';
-  }
-  else {
-    echo "  <td";
-    if ($class) echo " class='$class'";
-    if ($right) echo " align='right'";
-    echo ">$data</td>\n";
-  }
-  ++$cellcount;
-}
-*********************************************************************/
-
 function getListTitle($list, $option)
 {
     $row = sqlQuery("SELECT title FROM list_options WHERE " .
-    "list_id = '$list' AND option_id = '$option'");
+    "list_id = ? AND option_id = ?", array($list, $option));
     if (empty($row['title'])) {
         return $option;
     }
@@ -233,16 +226,16 @@ function genAnyCell($data, $right = false, $class = '', $colspan = 1)
         } else {
             echo "  <td";
             if ($class) {
-                echo " class='$class'";
+                echo " class='" . attr($class) . "'";
             }
 
             if ($colspan > 1) {
-                echo " colspan='$colspan' align='center'";
+                echo " colspan='" . attr($colspan) . "' align='center'";
             } else if ($right) {
                 echo " align='right'";
             }
 
-            echo ">$datum</td>\n";
+            echo ">" . text($datum) . "</td>\n";
         }
 
         ++$cellcount;
@@ -433,9 +426,9 @@ function hadRecentAbService($pid, $encdate)
 {
     $query = "SELECT COUNT(*) AS count " .
     "FROM form_encounter AS fe, billing AS b, codes AS c WHERE " .
-    "fe.pid = '$pid' AND " .
-    "fe.date <= '$encdate' AND " .
-    "DATE_ADD(fe.date, INTERVAL 14 DAY) > '$encdate' AND " .
+    "fe.pid = ? AND " .
+    "fe.date <= ? AND " .
+    "DATE_ADD(fe.date, INTERVAL 14 DAY) > ? AND " .
     "b.pid = fe.pid AND " .
     "b.encounter = fe.encounter AND " .
     "b.activity = 1 AND " .
@@ -443,7 +436,7 @@ function hadRecentAbService($pid, $encdate)
     "c.code_type = '12' AND " .
     "c.code = b.code AND c.modifier = b.modifier AND " .
     "( c.related_code LIKE '%IPPF:252223%' OR c.related_code LIKE '%IPPF:252224%' )";
-    $tmp = sqlQuery($query);
+    $tmp = sqlQuery($query, array($pid, $encdate, $encdate));
     return !empty($tmp['count']);
 }
 
@@ -464,18 +457,18 @@ function getGcacClientStatus($row)
   // attached to the visit associated with $row.
     $query = "SELECT lo.title " .
     "FROM forms AS f, form_encounter AS fe, lbf_data AS d, list_options AS lo " .
-    "WHERE f.pid = '$pid' AND " .
+    "WHERE f.pid = ? AND " .
     "f.formdir = 'LBFgcac' AND " .
     "f.deleted = 0 AND " .
     "fe.pid = f.pid AND fe.encounter = f.encounter AND " .
-    "fe.date <= '$encdate' AND " .
-    "DATE_ADD(fe.date, INTERVAL 14 DAY) > '$encdate' AND " .
+    "fe.date <= ? AND " .
+    "DATE_ADD(fe.date, INTERVAL 14 DAY) > ? AND " .
     "d.form_id = f.form_id AND " .
     "d.field_id = 'client_status' AND " .
     "lo.list_id = 'clientstatus' AND " .
     "lo.option_id = d.field_value " .
     "ORDER BY d.form_id DESC LIMIT 1";
-    $irow = sqlQuery($query);
+    $irow = sqlQuery($query, array($pid, $encdate, $encdate));
     if (!empty($irow['title'])) {
         return $irow['title'];
     }
@@ -501,15 +494,15 @@ function getGcacClientStatus($row)
     "WHERE " .
     "t.title = 'Referral' AND " .
     "t.refer_date IS NOT NULL AND " .
-    "t.refer_date <= '$encdate' AND " .
-    "DATE_ADD(t.refer_date, INTERVAL 14 DAY) > '$encdate' AND " .
+    "t.refer_date <= ? AND " .
+    "DATE_ADD(t.refer_date, INTERVAL 14 DAY) > ? AND " .
     "( t.refer_related_code LIKE '%IPPF:252223%' OR " .
     "t.refer_related_code LIKE '%IPPF:252224%' OR " .
     "( c.related_code IS NOT NULL AND " .
     "( c.related_code LIKE '%IPPF:252223%' OR " .
     "c.related_code LIKE '%IPPF:252224%' )))";
 
-    $tmp = sqlQuery($query);
+    $tmp = sqlQuery($query, array($encdate, $encdate));
     if (!empty($tmp['count'])) {
         return xl('Outbound Referral');
     }
@@ -628,9 +621,7 @@ function process_ippf_code($row, $code, $quantity = 1)
                 return;
             }
         }
-    } // General Service Category
-  //
-    else if ($form_by === '3') {
+    } else if ($form_by === '3') { // General Service Category
         if (preg_match('/^1/', $code)) {
             $key = xl('SRH - Family Planning');
         } else if (preg_match('/^2/', $code)) {
@@ -642,9 +633,7 @@ function process_ippf_code($row, $code, $quantity = 1)
         } else {
             $key = xl('Invalid Service Codes');
         }
-    } // Abortion-Related Category
-  //
-    else if ($form_by === '13') {
+    } else if ($form_by === '13') { // Abortion-Related Category
         if (preg_match('/^252221/', $code)) {
             $key = xl('Pre-Abortion Counseling');
         } else if (preg_match('/^252222/', $code)) {
@@ -666,13 +655,9 @@ function process_ippf_code($row, $code, $quantity = 1)
                 return;
             }
         }
-    } // Specific Services. One row for each IPPF code.
-  //
-    else if ($form_by === '4') {
+    } else if ($form_by === '4') { // Specific Services. One row for each IPPF code.
         $key = $code;
-    } // Specific Contraceptive Services. One row for each IPPF code.
-  //
-    else if ($form_by === '104') {
+    } else if ($form_by === '104') { // Specific Contraceptive Services. One row for each IPPF code.
         if ($form_content != 5) {
             // Skip codes not for contraceptive services.
             $tmp = getContraceptiveMethod($code);
@@ -682,9 +667,7 @@ function process_ippf_code($row, $code, $quantity = 1)
         }
 
         $key = $code;
-    } // Abortion Method.
-  //
-    else if ($form_by === '5') {
+    } else if ($form_by === '5') { // Abortion Method.
         $key = getAbortionMethod($code);
         if (empty($key)) {
             if ($form_content != 5) {
@@ -693,9 +676,7 @@ function process_ippf_code($row, $code, $quantity = 1)
 
             $key = 'Unspecified';
         }
-    } // Contraceptive Method.
-  //
-    else if ($form_by === '6') {
+    } else if ($form_by === '6') { // Contraceptive Method.
         $key = getContraceptiveMethod($code);
         if (empty($key)) {
             if ($form_content != 5) {
@@ -704,33 +685,34 @@ function process_ippf_code($row, $code, $quantity = 1)
 
             $key = 'Unspecified';
         }
-    } /*******************************************************************
-  // Contraceptive method for new contraceptive adoption following abortion.
-  // Get it from the IPPF code if an abortion issue is linked to the visit.
-  // Note we are handling this during processing of services rather than
-  // by enumerating issues, because we need the service date.
-  //
-  else if ($form_by === '7') {
-    $key = getContraceptiveMethod($code);
-    if (empty($key)) return;
-    $patient_id = $row['pid'];
-    $encounter_id = $row['encounter'];
-    $query = "SELECT COUNT(*) AS count " .
-      "FROM lists AS l " .
-      "JOIN issue_encounter AS ie ON ie.pid = '$patient_id' AND " .
-      "ie.encounter = '$encounter_id' AND ie.list_id = l.id " .
-      "WHERE l.pid = '$patient_id' AND " .
-      "l.activity = 1 AND l.type = 'ippf_gcac'";
-    // echo "<!-- $key: $query -->\n"; // debugging
-    $irow = sqlQuery($query);
-    if (empty($irow['count'])) return;
-  }
-  *******************************************************************/
 
-  // Contraceptive method for new contraceptive adoption following abortion.
-  // Get it from the IPPF code if there is a suitable recent GCAC form.
-  //
-    else if ($form_by === '7') {
+        /*******************************************************************
+        // Contraceptive method for new contraceptive adoption following abortion.
+        // Get it from the IPPF code if an abortion issue is linked to the visit.
+        // Note we are handling this during processing of services rather than
+        // by enumerating issues, because we need the service date.
+        //
+        else if ($form_by === '7') {
+        $key = getContraceptiveMethod($code);
+        if (empty($key)) return;
+        $patient_id = $row['pid'];
+        $encounter_id = $row['encounter'];
+        $query = "SELECT COUNT(*) AS count " .
+        "FROM lists AS l " .
+        "JOIN issue_encounter AS ie ON ie.pid = '$patient_id' AND " .
+        "ie.encounter = '$encounter_id' AND ie.list_id = l.id " .
+        "WHERE l.pid = '$patient_id' AND " .
+        "l.activity = 1 AND l.type = 'ippf_gcac'";
+        // echo "<!-- $key: $query -->\n"; // debugging
+        $irow = sqlQuery($query);
+        if (empty($irow['count'])) return;
+        }
+         *******************************************************************/
+
+        // Contraceptive method for new contraceptive adoption following abortion.
+        // Get it from the IPPF code if there is a suitable recent GCAC form.
+        //
+    } else if ($form_by === '7') {
         $key = getContraceptiveMethod($code);
         if (empty($key)) {
             return;
@@ -742,79 +724,76 @@ function process_ippf_code($row, $code, $quantity = 1)
         if (!hadRecentAbService($patient_id, $encdate)) {
             $query = "SELECT COUNT(*) AS count " .
             "FROM forms AS f, form_encounter AS fe, lbf_data AS d " .
-            "WHERE f.pid = '$patient_id' AND " .
+            "WHERE f.pid = ? AND " .
             "f.formdir = 'LBFgcac' AND " .
             "f.deleted = 0 AND " .
             "fe.pid = f.pid AND fe.encounter = f.encounter AND " .
-            "fe.date <= '$encdate' AND " .
-            "DATE_ADD(fe.date, INTERVAL 14 DAY) > '$encdate' AND " .
+            "fe.date <= ? AND " .
+            "DATE_ADD(fe.date, INTERVAL 14 DAY) > ? AND " .
             "d.form_id = f.form_id AND " .
             "d.field_id = 'client_status' AND " .
             "( d.field_value = 'maaa' OR d.field_value = 'refout' )";
-            $irow = sqlQuery($query);
+            $irow = sqlQuery($query, array($patient_id, $encdate, $encdate));
             if (empty($irow['count'])) {
                 return;
             }
         }
-    } // Post-Abortion Care and Followup by Source.
-  // Requirements just call for counting sessions, but this way the columns
-  // can be anything - age category, religion, whatever.
-  //
-    else if ($form_by === '8') {
+    } else if ($form_by === '8') { // Post-Abortion Care and Followup by Source.
+        // Requirements just call for counting sessions, but this way the columns
+        // can be anything - age category, religion, whatever.
         if (preg_match('/^25222[567]/', $code)) { // care, followup and incomplete abortion treatment
             $key = getGcacClientStatus($row);
         } else {
             return;
         }
-    } /*******************************************************************
-  // Complications of abortion by abortion method and complication type.
-  // These may be noted either during recovery or during a followup visit.
-  // Again, driven by services in order to report by service date.
-  // Note: If there are multiple complications, they will all be reported.
-  //
-  else if ($form_by === '11') {
-    $compl_type = '';
-    if (preg_match('/^25222[345]/', $code)) { // all abortions including incomplete
-      $compl_type = 'rec_compl';
-    }
-    else if (preg_match('/^25222[67]/', $code)) { // all post-abortion care and followup
-      $compl_type = 'fol_compl';
-    }
-    else {
-      return;
-    }
-    $irow = getGcacData($row, "lg.$compl_type, lo.title",
-      "LEFT JOIN list_options AS lo ON lo.list_id = 'in_ab_proc' AND " .
-      "lo.option_id = lg.in_ab_proc");
-    if (empty($irow)) return; // this should not happen
-    if (empty($irow[$compl_type])) return; // ok, no complications
-    // We have one or more complications.
-    $abtype = empty($irow['title']) ? xl('Indeterminate') : $irow['title'];
-    $acompl = explode('|', $irow[$compl_type]);
-    foreach ($acompl as $compl) {
-      $crow = sqlQuery("SELECT title FROM list_options WHERE " .
-        "list_id = 'complication' AND option_id = '$compl'");
-      $key = "$abtype / " . $crow['title'];
-      loadColumnData($key, $row);
-    }
-    return; // because loadColumnData() is already done.
-  }
-  *******************************************************************/
 
-  // Pre-Abortion Counseling.  Three possible situations:
-  //   Provided abortion in the MA clinics
-  //   Referred to other service providers (govt,private clinics)
-  //   Decided not to have the abortion
-  //
-    else if ($form_by === '12') {
+        /*******************************************************************
+        // Complications of abortion by abortion method and complication type.
+        // These may be noted either during recovery or during a followup visit.
+        // Again, driven by services in order to report by service date.
+        // Note: If there are multiple complications, they will all be reported.
+        //
+        else if ($form_by === '11') {
+        $compl_type = '';
+        if (preg_match('/^25222[345]/', $code)) { // all abortions including incomplete
+        $compl_type = 'rec_compl';
+        }
+        else if (preg_match('/^25222[67]/', $code)) { // all post-abortion care and followup
+        $compl_type = 'fol_compl';
+        }
+        else {
+        return;
+        }
+        $irow = getGcacData($row, "lg.$compl_type, lo.title",
+        "LEFT JOIN list_options AS lo ON lo.list_id = 'in_ab_proc' AND " .
+        "lo.option_id = lg.in_ab_proc");
+        if (empty($irow)) return; // this should not happen
+        if (empty($irow[$compl_type])) return; // ok, no complications
+        // We have one or more complications.
+        $abtype = empty($irow['title']) ? xl('Indeterminate') : $irow['title'];
+        $acompl = explode('|', $irow[$compl_type]);
+        foreach ($acompl as $compl) {
+        $crow = sqlQuery("SELECT title FROM list_options WHERE " .
+        "list_id = 'complication' AND option_id = '$compl'");
+        $key = "$abtype / " . $crow['title'];
+        loadColumnData($key, $row);
+        }
+        return; // because loadColumnData() is already done.
+        }
+         *******************************************************************/
+
+        // Pre-Abortion Counseling.  Three possible situations:
+        //   Provided abortion in the MA clinics
+        //   Referred to other service providers (govt,private clinics)
+        //   Decided not to have the abortion
+        //
+    } else if ($form_by === '12') {
         if (preg_match('/^252221/', $code)) { // all pre-abortion counseling
             $key = getGcacClientStatus($row);
         } else {
             return;
         }
-    } // Patient Name.
-  //
-    else if ($form_by === '17') {
+    } else if ($form_by === '17') { // Patient Name.
         $key = $row['lname'] . ', ' . $row['fname'] . ' ' . $row['mname'];
     } else {
         return; // no match, so do nothing
@@ -838,17 +817,11 @@ function process_ma_code($row)
         if (!empty($row['lo_title'])) {
             $key = xl($row['lo_title']);
         }
-    } // Specific Services. One row for each MA code.
-  //
-    else if ($form_by === '102') {
+    } else if ($form_by === '102') { // Specific Services. One row for each MA code.
         $key = $row['code'];
-    } // One row for each referral source.
-  //
-    else if ($form_by === '103') {
+    } else if ($form_by === '103') { // One row for each referral source.
         $key = $row['referral_source'];
-    } // Just one row.
-  //
-    else if ($form_by === '2') {
+    } else if ($form_by === '2') { // Just one row.
         $key = $arr_content[$form_content];
     } else {
         return;
@@ -861,26 +834,26 @@ function LBFgcac_query($pid, $encounter, $name)
 {
     $query = "SELECT d.form_id, d.field_value " .
     "FROM forms AS f, form_encounter AS fe, lbf_data AS d " .
-    "WHERE f.pid = '$pid' AND " .
-    "f.encounter = '$encounter' AND " .
+    "WHERE f.pid = ? AND " .
+    "f.encounter = ? AND " .
     "f.formdir = 'LBFgcac' AND " .
     "f.deleted = 0 AND " .
     "fe.pid = f.pid AND fe.encounter = f.encounter AND " .
     "d.form_id = f.form_id AND " .
-    "d.field_id = '$name'";
-    return sqlStatement($query);
+    "d.field_id = ?";
+    return sqlStatement($query, array($pid, $encounter, $name));
 }
 
 function LBFgcac_title($form_id, $field_id, $list_id)
 {
     $query = "SELECT lo.title " .
     "FROM lbf_data AS d, list_options AS lo WHERE " .
-    "d.form_id = '$form_id' AND " .
-    "d.field_id = '$field_id' AND " .
-    "lo.list_id = '$list_id' AND " .
+    "d.form_id = ? AND " .
+    "d.field_id = ? AND " .
+    "lo.list_id = ? AND " .
     "lo.option_id = d.field_value " .
     "LIMIT 1";
-    $row = sqlQuery($query);
+    $row = sqlQuery($query, array($form_id, $field_id, $list_id));
     return empty($row['title']) ? '' : $row['title'];
 }
 
@@ -913,11 +886,9 @@ function process_visit($row)
         }
       }
         *****************************************************************/
-    } // Complications of abortion by abortion method and complication type.
-  // These may be noted either during recovery or during a followup visit.
-  // Note: If there are multiple complications, they will all be reported.
-  //
-    else if ($form_by === '11') {
+    } else if ($form_by === '11') { // Complications of abortion by abortion method and complication type.
+        // These may be noted either during recovery or during a followup visit.
+        // Note: If there are multiple complications, they will all be reported.
         $dres = LBFgcac_query($row['pid'], $row['encounter'], 'complications');
         while ($drow = sqlFetchArray($dres)) {
             $a = explode('|', $drow['field_value']);
@@ -927,7 +898,7 @@ function process_visit($row)
                 }
 
                 $crow = sqlQuery("SELECT title FROM list_options WHERE " .
-                "list_id = 'complication' AND option_id = '$complid'");
+                "list_id = 'complication' AND option_id = ?", array($complid));
                 $abtype = LBFgcac_title($drow['form_id'], 'in_ab_proc', 'in_ab_proc');
                 if (empty($abtype)) {
                     $abtype = xl('Indeterminate');
@@ -997,8 +968,8 @@ function process_referral($row)
             if ($codetype == 'REF') {
                 // This is the expected case; a direct IPPF code is obsolete.
                 $rrow = sqlQuery("SELECT related_code FROM codes WHERE " .
-                "code_type = '16' AND code = '$code' AND active = 1 " .
-                "ORDER BY id LIMIT 1");
+                "code_type = '16' AND code = ? AND active = 1 " .
+                "ORDER BY id LIMIT 1", array($code));
                 if (!empty($rrow['related_code'])) {
                         list($codetype, $code) = explode(':', $rrow['related_code']);
                 }
@@ -1043,24 +1014,18 @@ if ($form_output == 3) {
     header("Content-Disposition: attachment; filename=service_statistics_report.csv");
     header("Content-Description: File Transfer");
 } else {
-?>
+    ?>
 <html>
 <head>
-<?php html_header_show(); ?>
-<title><?php echo $report_title; ?></title>
+<title><?php echo text($report_title); ?></title>
 
-<link rel='stylesheet' href='<?php echo $css_header ?>' type='text/css'>
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.min.css">
+    <?php Header::setupHeader('datetime-picker'); ?>
 
 <style type="text/css">
 body       { font-family:sans-serif; font-size:10pt; font-weight:normal }
-.dehead    { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:bold }
-.detail    { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:normal }
+.dehead    { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:bold }
+.detail    { color:var(--black); font-family:sans-serif; font-size:10pt; font-weight:normal }
 </style>
-
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery/dist/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
-<script type="text/javascript" src="../../library/textformat.js?v=<?php echo $v_js_includes; ?>"></script>
 
 <script language="JavaScript">
 
@@ -1096,11 +1061,11 @@ f['form_show[]'].style.visibility = isdis;
 
 // End experimental code
 
-$(document).ready(function() {
+$(function() {
     $('.datepicker').datetimepicker({
         <?php $datetimepicker_timepicker = false; ?>
         <?php $datetimepicker_showseconds = false; ?>
-        <?php $datetimepicker_formatInput = false; ?>
+        <?php $datetimepicker_formatInput = true; ?>
         <?php require($GLOBALS['srcdir'] . '/js/xl/jquery-datetimepicker-2-5-4.js.php'); ?>
         <?php // can add any additional javascript settings to datetimepicker here; need to prepend first setting with a comma ?>
     });
@@ -1115,29 +1080,29 @@ $(document).ready(function() {
 
 <h2><?php echo $report_title; ?></h2>
 
-<form name='theform' method='post'
-action='ippf_statistics.php?t=<?php echo $report_type ?>'>
+<form name='theform' method='post' action='ippf_statistics.php?t=<?php echo attr_url($report_type); ?>' onsubmit='return top.restoreSession()'>
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <table border='0' cellspacing='5' cellpadding='1'>
 
 <!-- Begin experimental code -->
 <tr<?php echo (empty($arr_report)) ? " style='display:none'" : ""; ?>>
 <td valign='top' class='dehead' nowrap>
-<?php xl('Report', 'e'); ?>:
+    <?php echo xlt('Report'); ?>:
 </td>
 <td valign='top' class='detail' colspan='3'>
  <select name='form_report' title='Predefined reports' onchange='selreport()'>
-<?php
-echo "    <option value=''>" . xl('Custom') . "</option>\n";
-foreach ($arr_report as $key => $value) {
-    echo "    <option value='$key'";
-    if ($key == $form_report) {
-        echo " selected";
-    }
+    <?php
+    echo "    <option value=''>" . xlt('Custom') . "</option>\n";
+    foreach ($arr_report as $key => $value) {
+        echo "    <option value='" . attr($key) . "'";
+        if ($key == $form_report) {
+            echo " selected";
+        }
 
-    echo ">" . $value . "</option>\n";
-}
-?>
+        echo ">" . text($value) . "</option>\n";
+    }
+    ?>
  </select>
 </td>
 <td valign='top' class='detail'>
@@ -1148,37 +1113,37 @@ foreach ($arr_report as $key => $value) {
 
 <tr>
 <td valign='top' class='dehead' nowrap>
-<?php xl('Rows', 'e'); ?>:
+    <?php echo xlt('Rows'); ?>:
 </td>
 <td valign='top' class='detail'>
  <select name='form_by' title='Left column of report'>
-<?php
-foreach ($arr_by as $key => $value) {
-    echo "    <option value='$key'";
-    if ($key == $form_by) {
-        echo " selected";
-    }
+    <?php
+    foreach ($arr_by as $key => $value) {
+        echo "    <option value='" . attr($key) . "'";
+        if ($key == $form_by) {
+            echo " selected";
+        }
 
-    echo ">" . $value . "</option>\n";
-}
-?>
+        echo ">" . text($value) . "</option>\n";
+    }
+    ?>
  </select>
 </td>
 <td valign='top' class='dehead' nowrap>
-<?php xl('Content', 'e'); ?>:
+    <?php echo xlt('Content'); ?>:
 </td>
 <td valign='top' class='detail'>
-<select name='form_content' title='<?php xl('What is to be counted?', 'e'); ?>'>
-<?php
-foreach ($arr_content as $key => $value) {
-    echo "    <option value='$key'";
-    if ($key == $form_content) {
-        echo " selected";
-    }
+<select name='form_content' title='<?php echo xla('What is to be counted?'); ?>'>
+    <?php
+    foreach ($arr_content as $key => $value) {
+        echo "    <option value='" . attr($key) . "'";
+        if ($key == $form_content) {
+            echo " selected";
+        }
 
-    echo ">$value</option>\n";
-}
-?>
+        echo ">" . text($value) ."</option>\n";
+    }
+    ?>
  </select>
 </td>
 <td valign='top' class='detail'>
@@ -1187,85 +1152,83 @@ foreach ($arr_content as $key => $value) {
 </tr>
 <tr>
 <td valign='top' class='dehead' nowrap>
-<?php xl('Columns', 'e'); ?>:
+    <?php echo xlt('Columns'); ?>:
 </td>
 <td valign='top' class='detail'>
  <select name='form_show[]' size='4' multiple
-title='<?php xl('Hold down Ctrl to select multiple items', 'e'); ?>'>
-<?php
-foreach ($arr_show as $key => $value) {
-    $title = $value['title'];
-    if (empty($title) || $key == 'title') {
-        $title = $value['description'];
-    }
+title='<?php echo xla('Hold down Ctrl to select multiple items'); ?>'>
+    <?php
+    foreach ($arr_show as $key => $value) {
+        $title = $value['title'];
+        if (empty($title) || $key == 'title') {
+            $title = $value['description'];
+        }
 
-    echo "    <option value='$key'";
-    if (is_array($form_show) && in_array($key, $form_show)) {
-        echo " selected";
-    }
+        echo "    <option value='" . attr($key) . "'";
+        if (is_array($form_show) && in_array($key, $form_show)) {
+            echo " selected";
+        }
 
-    echo ">$title</option>\n";
-}
-?>
+        echo ">" . text($title) . "</option>\n";
+    }
+    ?>
  </select>
 </td>
 <td valign='top' class='dehead' nowrap>
-<?php xl('Filters', 'e'); ?>:
+    <?php echo xlt('Filters'); ?>:
 </td>
 <td colspan='2' class='detail' style='border-style:solid;border-width:1px;border-color:#cccccc'>
  <table>
   <tr>
    <td valign='top' class='detail' nowrap>
-    <?php xl('Sex', 'e'); ?>:
+    <?php echo xlt('Sex'); ?>:
    </td>
    <td class='detail' valign='top'>
-  <select name='form_sexes' title='<?php xl('To filter by sex', 'e'); ?>'>
-<?php
-foreach (array(3 => xl('Men and Women'), 1 => xl('Women Only'), 2 => xl('Men Only')) as $key => $value) {
-    echo "       <option value='$key'";
-    if ($key == $form_sexes) {
-        echo " selected";
-    }
+  <select name='form_sexes' title='<?php echo xla('To filter by sex'); ?>'>
+    <?php
+    foreach (array(3 => xl('Men and Women'), 1 => xl('Women Only'), 2 => xl('Men Only')) as $key => $value) {
+        echo "       <option value='" . attr($key) . "'";
+        if ($key == $form_sexes) {
+            echo " selected";
+        }
 
-    echo ">$value</option>\n";
-}
-?>
+        echo ">" . text($value) . "</option>\n";
+    }
+    ?>
     </select>
    </td>
   </tr>
   <tr>
    <td valign='top' class='detail' nowrap>
-    <?php xl('Facility', 'e'); ?>:
+    <?php echo xlt('Facility'); ?>:
    </td>
    <td valign='top' class='detail'>
-<?php
+    <?php
 // Build a drop-down list of facilities.
 //
-$fres = $facilityService->getAll();
-echo "      <select name='form_facility'>\n";
-echo "       <option value=''>-- All Facilities --\n";
-foreach ($fres as $frow) {
-    $facid = $frow['id'];
-    echo "       <option value='$facid'";
-    if ($facid == $_POST['form_facility']) {
-        echo " selected";
+    $fres = $facilityService->getAll();
+    echo "      <select name='form_facility'>\n";
+    echo "       <option value=''>-- All Facilities --\n";
+    foreach ($fres as $frow) {
+        $facid = $frow['id'];
+        echo "       <option value='" . attr($facid) . "'";
+        if ($facid == $_POST['form_facility']) {
+            echo " selected";
+        }
+
+        echo ">" . text($frow['name']) . "\n";
     }
 
-    echo ">" . $frow['name'] . "\n";
-}
-
-echo "      </select>\n";
-?>
+    echo "      </select>\n";
+    ?>
    </td>
   </tr>
   <tr>
    <td colspan='2' class='detail' nowrap>
-    <?php xl('From', 'e'); ?>
-  <input type='text' class='datepicker' name='form_from_date' id='form_from_date' size='10' value='<?php echo $from_date ?>'
-     title='Start date yyyy-mm-dd'>
-    <?php xl('To', 'e'); ?>
-  <input type='text' class='datepicker' name='form_to_date' id='form_to_date' size='10' value='<?php echo $to_date ?>'
-     title='End date yyyy-mm-dd'>
+    <?php echo xlt('From'); ?>
+  <input type='text' class='datepicker' name='form_from_date' id='form_from_date' size='10' value='<?php echo attr(oeFormatShortDate($from_date)); ?>'>
+    <?php echo xlt('To{{Range}}'); ?>
+  <input type='text' class='datepicker' name='form_to_date' id='form_to_date' size='10' value='<?php echo attr(oeFormatShortDate($to_date)); ?>'>
    </td>
   </tr>
  </table>
@@ -1273,23 +1236,23 @@ echo "      </select>\n";
 </tr>
 <tr>
 <td valign='top' class='dehead' nowrap>
-<?php xl('To', 'e'); ?>:
+    <?php echo xlt('To{{Destination}}'); ?>:
 </td>
 <td colspan='3' valign='top' class='detail' nowrap>
-<?php
-foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $value) {
-    echo "   <input type='radio' name='form_output' value='$key'";
-    if ($key == $form_output) {
-        echo ' checked';
-    }
+    <?php
+    foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $value) {
+        echo "   <input type='radio' name='form_output' value='" . attr($key) . "'";
+        if ($key == $form_output) {
+            echo ' checked';
+        }
 
-    echo " />$value &nbsp;";
-}
-?>
+        echo " />" . text($value) . " &nbsp;";
+    }
+    ?>
 </td>
 <td align='right' valign='top' class='detail' nowrap>
-<input type='submit' name='form_submit' value='<?php xl('Submit', 'e'); ?>'
-title='<?php xl('Click to generate the report', 'e'); ?>' />
+<input type='submit' name='form_submit' value='<?php echo xla('Submit'); ?>'
+title='<?php echo xla('Click to generate the report'); ?>' />
 </td>
 </tr>
 <tr>
@@ -1297,7 +1260,7 @@ title='<?php xl('Click to generate the report', 'e'); ?>' />
 </td>
 </tr>
 </table>
-<?php
+    <?php
 } // end not export
 
 if ($_POST['form_submit']) {
@@ -1313,7 +1276,7 @@ if ($_POST['form_submit']) {
             continue;
         }
 
-        $pd_fields .= ', pd.' . $askey;
+        $pd_fields .= ', pd.' . escape_sql_column_name($askey, array('patient_data'));
     }
 
     $sexcond = '';
@@ -1322,6 +1285,8 @@ if ($_POST['form_submit']) {
     } else if ($form_sexes == '2') {
         $sexcond = "AND pd.sex LIKE 'Male' ";
     }
+
+    $sqlBindArray = array();
 
     // In the case where content is contraceptive product sales, we
     // scan product sales at the top level because it is important to
@@ -1341,16 +1306,18 @@ if ($_POST['form_submit']) {
         "JOIN drugs AS d ON d.drug_id = ds.drug_id " .
         "JOIN patient_data AS pd ON pd.pid = ds.pid $sexcond" .
         "LEFT JOIN form_encounter AS fe ON fe.pid = ds.pid AND fe.encounter = ds.encounter " .
-        "WHERE ds.sale_date >= '$from_date' AND " .
-        "ds.sale_date <= '$to_date' AND " .
+        "WHERE ds.sale_date >= ? AND " .
+        "ds.sale_date <= ? AND " .
         "ds.pid > 0 AND ds.quantity != 0";
+        array_push($sqlBindArray, $from_date, $to_date);
 
         if ($form_facility) {
-            $query .= " AND fe.facility_id = '$form_facility'";
+            $query .= " AND fe.facility_id = ?";
+            array_push($sqlBindArray, $form_facility);
         }
 
         $query .= " ORDER BY ds.pid, ds.encounter, ds.drug_id";
-        $res = sqlStatement($query);
+        $res = sqlStatement($query, $sqlBindArray);
 
         while ($row = sqlFetchArray($res)) {
             $desired = false;
@@ -1376,11 +1343,11 @@ if ($_POST['form_submit']) {
                 "FROM billing AS b " .
                 "LEFT OUTER JOIN codes AS c ON c.code_type = '12' AND " .
                 "c.code = b.code AND c.modifier = b.modifier " .
-                "WHERE b.pid = " . (0 + $row['pid']) . " AND " .
-                "b.encounter = " . (0 + $row['encounter']) . " AND " .
+                "WHERE b.pid = ? AND " .
+                "b.encounter = ? AND " .
                 "b.activity = 1 AND b.code_type = 'MA' " .
                 "ORDER BY b.code";
-                $bres = sqlStatement($query);
+                $bres = sqlStatement($query, array((0 + $row['pid']), (0 + $row['encounter'])));
                 while ($brow = sqlFetchArray($bres)) {
                     $tmp = getRelatedContraceptiveCode($brow);
                     if (!empty($tmp)) {
@@ -1414,9 +1381,9 @@ if ($_POST['form_submit']) {
         "FROM transactions AS t " .
         "JOIN patient_data AS pd ON pd.pid = t.pid $sexcond" .
         "WHERE t.title = 'Referral' AND $datefld IS NOT NULL AND " .
-        "$datefld >= '$from_date' AND $datefld <= '$to_date' AND $exttest " .
+        "$datefld >= ? AND $datefld <= ? AND $exttest " .
         "ORDER BY t.pid, t.id";
-        $res = sqlStatement($query);
+        $res = sqlStatement($query, array($from_date, $to_date));
         while ($row = sqlFetchArray($res)) {
             process_referral($row);
         }
@@ -1486,8 +1453,10 @@ if ($_POST['form_submit']) {
     *****************************************************************/
 
     if ($form_content != 5 && $form_by !== '9' && $form_by !== '10' && $form_by !== '20') {
-      // This gets us all MA codes, with encounter and patient
-      // info attached and grouped by patient and encounter.
+        $sqlBindArray = array();
+
+        // This gets us all MA codes, with encounter and patient
+        // info attached and grouped by patient and encounter.
         $query = "SELECT " .
         "fe.pid, fe.encounter, fe.date AS encdate, pd.regdate, " .
         "f.user AS provider, " .
@@ -1505,15 +1474,17 @@ if ($_POST['form_submit']) {
         "c.code = b.code AND c.modifier = b.modifier " .
         "LEFT OUTER JOIN list_options AS lo ON " .
         "lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
-        "WHERE fe.date >= '$from_date 00:00:00' AND " .
-        "fe.date <= '$to_date 23:59:59' ";
+        "WHERE fe.date >= ? AND " .
+        "fe.date <= ? ";
+        array_push($sqlBindArray, $from_date.' 00:00:00', $to_date.' 23:59:59');
 
         if ($form_facility) {
             $query .= "AND fe.facility_id = '$form_facility' ";
+            array_push($sqlBindArray, $form_facility);
         }
 
         $query .= "ORDER BY fe.pid, fe.encounter, b.code";
-        $res = sqlStatement($query);
+        $res = sqlStatement($query, $sqlBindArray);
 
         $prev_encounter = 0;
 
@@ -1641,7 +1612,7 @@ if ($_POST['form_submit']) {
             $dispkey = array($key, '');
             $type = $form_by === '102' ? 12 : 11; // MA or IPPF
             $crow = sqlQuery("SELECT code_text FROM codes WHERE " .
-            "code_type = '$type' AND code = '$key' ORDER BY id LIMIT 1");
+            "code_type = ? AND code = ? ORDER BY id LIMIT 1", array($type, $key));
             if (!empty($crow['code_text'])) {
                 $dispkey[1] = $crow['code_text'];
             }
@@ -1706,13 +1677,13 @@ if ($_POST['form_submit']) {
 } // end of if refresh or export
 
 if ($form_output != 3) {
-?>
+    ?>
 </form>
 </center>
 
 <script language='JavaScript'>
 selreport();
-<?php if ($form_output == 2) { ?>
+    <?php if ($form_output == 2) { ?>
  var win = top.printLogPrint ? top : opener.top;
  win.printLogPrint(window);
 <?php } ?>
@@ -1720,6 +1691,6 @@ selreport();
 
 </body>
 </html>
-<?php
+    <?php
 } // end not export
 ?>

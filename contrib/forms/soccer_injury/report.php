@@ -1,6 +1,6 @@
 <?php
-include_once("../../globals.php");
-include_once($GLOBALS["srcdir"]."/api.inc");
+require_once("../../globals.php");
+require_once($GLOBALS["srcdir"]."/api.inc");
 
 $si_report_cols  = 2;
 $si_report_colno = 0;
@@ -20,8 +20,8 @@ function si_report_item($title, $value)
         echo " </tr>\n <tr>\n";
     }
 
-    echo "  <td valign='top'><span class='bold'>$title: </span>" .
-    "<span class='text'>$value &nbsp;</span></td>\n";
+    echo "  <td valign='top'><span class='bold'>" . text($title) . ": </span>" .
+    "<span class='text'>" . text($value) ." &nbsp;</span></td>\n";
 }
 
 // This function is invoked from printPatientForms in report.inc
@@ -141,10 +141,10 @@ function soccer_injury_report($pid, $encounter, $cols, $id)
     $row = sqlQuery("SELECT form_encounter.onset_date AS occdate, si.* " .
     "FROM forms, form_encounter, form_soccer_injury AS si WHERE " .
     "forms.formdir = 'soccer_injury' AND " .
-    "forms.form_id = '$id' AND " .
-    "si.id = '$id' AND si.activity = '1' AND " .
+    "forms.form_id = ? AND " .
+    "si.id = ? AND si.activity = '1' AND " .
     "form_encounter.encounter = forms.encounter AND " .
-    "form_encounter.pid = forms.pid");
+    "form_encounter.pid = forms.pid", array($id));
 
     if (!$row) {
         return;

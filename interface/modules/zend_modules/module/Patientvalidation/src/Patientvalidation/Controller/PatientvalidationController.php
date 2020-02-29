@@ -20,23 +20,29 @@
 namespace Patientvalidation\Controller;
 
 use Patientvalidation\Model\PatientData;
-use Zend\Json\Server\Exception\ErrorException;
-use Zend\Mvc\Controller\AbstractActionController;
-use Zend\View\Model\ViewModel;
+use Laminas\Json\Server\Exception\ErrorException;
+use Laminas\Mvc\Controller\AbstractActionController;
+use Laminas\View\Model\ViewModel;
 use Application\Listener\Listener;
+use Patientvalidation\Model\PatientDataTable;
 use Error;
 
 class PatientvalidationController extends BaseController
 {
 
+    /**
+     * @var PatientDataTable
+     */
+    private $PatientDataTable;
 
     /**
      * PatientvalidationController constructor.
      */
-    public function __construct()
+    public function __construct(PatientDataTable $dataTable)
     {
         parent::__construct();
         $this->listenerObject = new Listener;
+        $this->PatientDataTable = $dataTable;
         //todo add permission of admin
     }
 
@@ -72,7 +78,7 @@ class PatientvalidationController extends BaseController
         }
     }
     /**
-     * @return \Zend\Stdlib\ResponseInterface the index action
+     * @return \Laminas\Stdlib\ResponseInterface the index action
      */
 
     public function indexAction()
@@ -97,10 +103,6 @@ class PatientvalidationController extends BaseController
      */
     private function getPatientDataTable()
     {
-        if (!$this->PatientDataTable) {
-            $sm = $this->getServiceLocator();
-            $this->PatientDataTable = $sm->get('Patientvalidation\Model\PatientDataTable');
-        }
 
         return $this->PatientDataTable;
     }

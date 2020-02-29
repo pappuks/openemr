@@ -19,14 +19,14 @@ class ORDataObject
     function persist()
     {
         $sql = "REPLACE INTO " . $this->_prefix . $this->_table . " SET ";
-        //echo "<br><br>";
+        //echo "<br /><br />";
         $fields = sqlListFields($this->_table);
         $db = get_db();
         $pkeys = $db->MetaPrimaryKeys($this->_table);
 
         foreach ($fields as $field) {
             $func = "get_" . $field;
-            //echo "f: $field m: $func status: " .  (is_callable(array($this,$func))? "yes" : "no") . "<br>";
+            //echo "f: $field m: $func status: " .  (is_callable(array($this,$func))? "yes" : "no") . "<br />";
             if (is_callable(array($this,$func))) {
                 $val = call_user_func(array($this,$func));
 
@@ -37,7 +37,7 @@ class ORDataObject
                 }
 
                 if (!empty($val)) {
-                    //echo "s: $field to: $val <br>";
+                    //echo "s: $field to: $val <br />";
 
                                         //modified 01-2010 by BGM to centralize to formdata.inc.php
                             // have place several debug statements to allow standardized testing over next several months
@@ -53,22 +53,22 @@ class ORDataObject
                 $sql = substr($sql, 0, (strlen($sql) -1));
         }
 
-        //echo "<br>sql is: " . $sql . "<br /><br>";
+        //echo "<br />sql is: " . $sql . "<br /><br />";
         sqlQuery($sql);
         return true;
     }
 
     function populate()
     {
-        $sql = "SELECT * from " . $this->_prefix  . $this->_table . " WHERE id = '" . add_escape_custom(strval($this->id))  . "'";
-        $results = sqlQuery($sql);
+        $sql = "SELECT * from " . escape_table_name($this->_prefix.$this->_table) . " WHERE id = ?";
+        $results = sqlQuery($sql, [strval($this->id)]);
         if (is_array($results)) {
             foreach ($results as $field_name => $field) {
                 $func = "set_" . $field_name;
-                //echo "f: $field m: $func status: " .  (is_callable(array($this,$func))? "yes" : "no") . "<br>";
+                //echo "f: $field m: $func status: " .  (is_callable(array($this,$func))? "yes" : "no") . "<br />";
                 if (is_callable(array($this,$func))) {
                     if (!empty($field)) {
-                        //echo "s: $field_name to: $field <br>";
+                        //echo "s: $field_name to: $field <br />";
                         call_user_func(array(&$this,$func), $field);
                     }
                 }
@@ -81,10 +81,10 @@ class ORDataObject
         if (is_array($results)) {
             foreach ($results as $field_name => $field) {
                 $func = "set_" . $field_name;
-                //echo "f: $field m: $func status: " .  (is_callable(array($this,$func))? "yes" : "no") . "<br>";
+                //echo "f: $field m: $func status: " .  (is_callable(array($this,$func))? "yes" : "no") . "<br />";
                 if (is_callable(array($this,$func))) {
                     if (!empty($field)) {
-                        //echo "s: $field_name to: $field <br>";
+                        //echo "s: $field_name to: $field <br />";
                         call_user_func(array(&$this,$func), $field);
                     }
                 }
@@ -108,7 +108,7 @@ class ORDataObject
             return $GLOBALS['static']['enums'][$this->_table][$field_name];
         } else {
             $cols = $this->_db->MetaColumns($this->_table);
-            if ($cols && !$cols->EOF) {
+            if ((is_array($cols) && !empty($cols)) || ($cols && !$cols->EOF)) {
                 //why is there a foreach here? at some point later there will be a scheme to autoload all enums
                 //for an object rather than 1x1 manually as it is now
                 foreach ($cols as $col) {

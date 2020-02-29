@@ -1,21 +1,38 @@
 <?php
-include_once("../../globals.php");
-include_once("$srcdir/patient.inc");
-include_once("$srcdir/acl.inc");
-include_once("$srcdir/options.inc.php");
+/**
+ * demographics_save.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
+
+require_once("../../globals.php");
+require_once("$srcdir/patient.inc");
+require_once("$srcdir/options.inc.php");
+
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+
+if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
+}
 
 // Check authorization.
 if ($pid) {
-    if (!acl_check('patients', 'demo', '', 'write')) {
+    if (!AclMain::aclCheckCore('patients', 'demo', '', 'write')) {
         die(xlt('Updating demographics is not authorized.'));
     }
 
     $tmp = getPatientData($pid, "squad");
-    if ($tmp['squad'] && ! acl_check('squads', $tmp['squad'])) {
+    if ($tmp['squad'] && ! AclMain::aclCheckCore('squads', $tmp['squad'])) {
         die(xlt('You are not authorized to access this squad.'));
     }
 } else {
-    if (!acl_check('patients', 'demo', '', array('write','addonly'))) {
+    if (!AclMain::aclCheckCore('patients', 'demo', '', array('write','addonly'))) {
         die(xlt('Adding demographics is not authorized.'));
     }
 }

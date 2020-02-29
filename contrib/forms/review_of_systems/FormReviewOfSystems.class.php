@@ -72,8 +72,8 @@ class FormReviewOfSystems extends ORDataObject
     {
         parent::populate();
 
-        $sql = "SELECT name from form_review_of_systems_checks where foreign_id = '" . add_escape_custom($this->id) . "'";
-        $results = sqlQ($sql);
+        $sql = "SELECT name from form_review_of_systems_checks where foreign_id = ?";
+        $results = sqlQ($sql, array($this->id));
 
         while ($row = sqlFetchArray($results)) {
             $this->checks[] = $row['name'];
@@ -84,13 +84,13 @@ class FormReviewOfSystems extends ORDataObject
     {
         parent::persist();
         if (is_numeric($this->id) and !empty($this->checks)) {
-            $sql = "delete FROM form_review_of_systems_checks where foreign_id = '" . $this->id . "'";
-            sqlQuery($sql);
+            $sql = "delete FROM form_review_of_systems_checks where foreign_id = ?";
+            sqlQuery($sql, array($this->id ));
             foreach ($this->checks as $check) {
                 if (!empty($check)) {
-                    $sql = "INSERT INTO form_review_of_systems_checks set foreign_id='"  . add_escape_custom($this->id) . "', name = '" . add_escape_custom($check) . "'";
-                    sqlQuery($sql);
-                    //echo "$sql<br>";
+                    $sql = "INSERT INTO form_review_of_systems_checks set foreign_id= ?, name = ?";
+                    sqlQuery($sql, array($this->id, $check));
+                    //echo "$sql<br />";
                 }
             }
         }
@@ -380,9 +380,9 @@ class FormReviewOfSystems extends ORDataObject
 
         $at = array();
         $a_bottom = array();
-        $at["When sexually active,<br> are you active with:"]['sexually_active_men']    =  "Men";
-        $at["When sexually active,<br> are you active with:"]['sexually_active_women']  =  "Women";
-        $at["When sexually active,<br> are you active with:"]['sexually_active_both']   =  "Both";
+        $at["When sexually active,<br /> are you active with:"]['sexually_active_men']    =  "Men";
+        $at["When sexually active,<br /> are you active with:"]['sexually_active_women']  =  "Women";
+        $at["When sexually active,<br /> are you active with:"]['sexually_active_both']   =  "Both";
 
         $a['General'] = $at;
 

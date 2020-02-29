@@ -25,6 +25,8 @@ require_once("$srcdir/patient.inc");
 require_once("$srcdir/options.inc.php");
 require_once("portal.inc.php");
 
+use OpenEMR\Core\Header;
+
 $postid = intval($_REQUEST['postid']);
 
 if ($postid) {
@@ -36,8 +38,7 @@ if ($postid) {
 ?>
 <html>
 <head>
-<?php html_header_show(); ?>
-<link rel=stylesheet href="<?php echo $css_header; ?>" type="text/css">
+<?php Header::setupHeader('no_dialog'); ?>
 <style>
 
 #searchResults {
@@ -71,12 +72,11 @@ if ($postid) {
 
 </style>
 
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/manual-added-packages/jquery-min-1-2-2/index.js"></script>
 <script language="JavaScript">
 
-$(document).ready(function(){
-  $(".oneresult").mouseover(function() {$(this).addClass("highlight");});
-  $(".oneresult").mouseout(function() {$(this).removeClass("highlight");});
+$(function(){
+  $(".oneresult").on("mouseover", function() {$(this).addClass("highlight");});
+  $(".oneresult").on("mouseout", function() {$(this).removeClass("highlight");});
 });
 
 var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
@@ -179,7 +179,7 @@ if ($postid) {
     if (empty($phone)) {
         $phone = $result['fields']['phone_contact'];
     }
-?>
+    ?>
 
 <div id="searchResults">
  <table>
@@ -200,56 +200,56 @@ if ($postid) {
    <th style='font-weight:normal'><?php echo text($result['fields']['street'] . ' ' . $zip); ?></th>
   </tr>
 
-<?php
-while ($row = sqlFetchArray($res)) {
-    if ($row['closeness'] == 0) {
-        continue;
-    }
-
-    if ($row['closeness'] >= 100) {
-        ++$login_matches;
-        $login_pid = $row['pid'];
-    } else {
-      // We have a match on login name but this is not one, so ignore it.
-        if ($login_matches) {
+    <?php
+    while ($row = sqlFetchArray($res)) {
+        if ($row['closeness'] == 0) {
             continue;
         }
-    }
 
-    $phone = $row['phone_biz'];
-    if (empty($phone)) {
-        $phone = $row['phone_home'];
-    }
+        if ($row['closeness'] >= 100) {
+            ++$login_matches;
+            $login_pid = $row['pid'];
+        } else {
+          // We have a match on login name but this is not one, so ignore it.
+            if ($login_matches) {
+                continue;
+            }
+        }
 
-    if (empty($phone)) {
-        $phone = $row['phone_cell'];
-    }
+        $phone = $row['phone_biz'];
+        if (empty($phone)) {
+            $phone = $row['phone_home'];
+        }
 
-    if (empty($phone)) {
-        $phone = $row['phone_contact'];
-    }
+        if (empty($phone)) {
+            $phone = $row['phone_cell'];
+        }
 
-    echo "  <tr class='oneresult'";
-    echo " onclick=\"openPatient(" .
-     "'" . addslashes($row['pid']) . "'"  .
-     ")\">\n";
-    echo "   <td";
-    if ($row['cmsportal_login'] !== '' && $result['post']['user'] !== $row['cmsportal_login']) {
-        echo " style='color:red' title='" . xla('Portal ID does not match request from portal!') . "'";
-    }
+        if (empty($phone)) {
+            $phone = $row['phone_contact'];
+        }
 
-    echo ">" . text($row['cmsportal_login']) . "</td>\n";
-    echo "   <td>" . text($row['lname'] . ", " . $row['fname']) . "</td>\n";
-    echo "   <td>" . text($phone) . "</td>\n";
-    echo "   <td>" . text($row['ss']) . "</td>\n";
-    echo "   <td>" . text($row['DOB']) . "</td>\n";
-    echo "   <td>" . text($row['street'] . ' ' . $row['postal_code']) . "</td>\n";
-    echo "  </tr>\n";
-}
-?>
+        echo "  <tr class='oneresult'";
+        echo " onclick=\"openPatient(" .
+         "'" . addslashes($row['pid']) . "'"  .
+         ")\">\n";
+        echo "   <td";
+        if ($row['cmsportal_login'] !== '' && $result['post']['user'] !== $row['cmsportal_login']) {
+            echo " style='color:red' title='" . xla('Portal ID does not match request from portal!') . "'";
+        }
+
+        echo ">" . text($row['cmsportal_login']) . "</td>\n";
+        echo "   <td>" . text($row['lname'] . ", " . $row['fname']) . "</td>\n";
+        echo "   <td>" . text($phone) . "</td>\n";
+        echo "   <td>" . text($row['ss']) . "</td>\n";
+        echo "   <td>" . text($row['DOB']) . "</td>\n";
+        echo "   <td>" . text($row['street'] . ' ' . $row['postal_code']) . "</td>\n";
+        echo "  </tr>\n";
+    }
+    ?>
  </table>
 </div>
-<?php
+    <?php
 }
 
 if ($login_matches == 1) {

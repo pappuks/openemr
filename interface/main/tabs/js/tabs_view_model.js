@@ -81,8 +81,12 @@ function tabRefresh(data,evt)
 {
     top.restoreSession();
     // To do: Consider modification if part of frame.
-    data.window.location=data.window.location;
-    activateTab(data);
+    try {
+        data.window.location = data.window.location;
+        activateTab(data);
+    } catch(e) {
+        // Do nothing, but avoid exceptions caused by iFrames from different domain (ie NewCrop)
+    }
 }
 
 function tabClose(data,evt)
@@ -125,7 +129,7 @@ function navigateTab(url,name,afterLoadFunction)
     }
     else
     {
-        curTab=new tabStatus(xl_strings_tabs_view_model.new,url,name,true,false,false);
+        curTab=new tabStatus(xl('New'),url,name,true,false,false);
         app_view_model.application_data.tabs.tabsList.push(curTab);
         if(typeof afterLoadFunction === 'function'){
             afterLoadFunction();
@@ -197,7 +201,7 @@ function reviewEncounterEvent(data,evt)
 }
 function clickNewEncounter(data,evt)
 {
-    newEncounter();
+    newEncounter(data,evt);
 }
 
 function clickEncounterList(data,evt)
@@ -210,11 +214,16 @@ function clickNewGroupEncounter(data,evt)
     newTherapyGroupEncounter();
 }
 
-function newEncounter()
-{
-    var url=webroot_url+'/interface/forms/newpatient/new.php?autoloaded=1&calenc='
+function newEncounter(data, evt) {
+    var url = '';
+    if (typeof(data) === "object" && data.mode === "follow_up_encounter") {
+        url = webroot_url + '/interface/forms/newpatient/new.php?mode=followup&enc=' + data.encounterId + '&autoloaded=1&calenc=';
+    }
+    else {
+        url = webroot_url + '/interface/forms/newpatient/new.php?autoloaded=1&calenc=';
+    }
     navigateTab(url, "enc", function () {
-        activateTabByName("enc",true);
+        activateTabByName("enc", true);
     });
 
 }
@@ -270,7 +279,6 @@ function popMenuDialog(url, title) {
     });
 }
 
-// note the xl_strings_tabs_view_model variable is required for the alert messages and translations
 function menuActionClick(data,evt)
 {
 
@@ -290,13 +298,12 @@ function menuActionClick(data,evt)
             var encounterID=app_view_model.application_data[attendant_type]().selectedEncounterID();
             if(isEncounterLocked(encounterID))
             {
-                alert(xl_strings_tabs_view_model.encounter_locked);
+                alert(xl('This encounter is locked. No new forms can be added.'));
                 return;
             }
         }
 
         // Fixups for loading a new encounter form, as these are now in tabs.
-        // See loadNewForm() in left_nav.php for comparable logic in the non-tabs case.
         var dataurl = data.url();
         var matches = dataurl.match(/load_form.php\?formname=(\w+)/);
         if (matches) {
@@ -304,6 +311,7 @@ function menuActionClick(data,evt)
           for (var i = 0; i < frames.length; ++i) {
             if (frames[i].twAddFrameTab) {
               frames[i].twAddFrameTab('enctabs', data.label(), webroot_url + dataurl);
+              activateTabByName(data.target,true);
               return;
             }
           }
@@ -328,11 +336,11 @@ function menuActionClick(data,evt)
     {
         if(data.requirement===1)
         {
-            alert(xl_strings_tabs_view_model.must_select_patient);
+            alert((jsGlobals['globals']['enable_group_therapy'] == 1) ? xl('You must first select or add a patient or therapy group.') : xl('You must first select or add a patient.'));
         }
         else if((data.requirement===2)||data.requirement===3)
         {
-            alert(xl_strings_tabs_view_model.must_select_encounter);
+            alert(xl('You must first select or create an encounter.'));
         }
     }
 
@@ -354,11 +362,14 @@ function clearPatient()
     $.ajax({
         type: "POST",
         url: webroot_url+"/library/ajax/unset_session_ajax.php",
-	  data: { func: "unset_pid"},
-	  success:function( msg ) {
+	    data: {
+            func: "unset_pid",
+            csrf_token_form: csrf_token_js
+        },
+	    success:function( msg ) {
 
 
-	  }
+	    }
 	});
 }
 
@@ -377,7 +388,10 @@ function clearTherapyGroup()
     $.ajax({
         type: "POST",
         url: webroot_url+"/library/ajax/unset_session_ajax.php",
-        data: { func: "unset_gid"},
+        data: {
+            func: "unset_gid",
+            csrf_token_form: csrf_token_js
+        },
         success:function( msg ) {
 
 

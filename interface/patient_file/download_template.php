@@ -2,31 +2,29 @@
 /**
  * Document Template Download Module.
  *
- * Copyright (C) 2013-2014 Rod Roark <rod@sunsetsystems.com>
+ * This module downloads a specified document template to the browser after
+ * substituting relevant patient data into its variables.
  *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>.
- *
- * @package OpenEMR
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2013-2014 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
-// This module downloads a specified document template to the browser after
-// substituting relevant patient data into its variables.
 
 require_once('../globals.php');
-require_once($GLOBALS['srcdir'] . '/acl.inc');
 require_once($GLOBALS['srcdir'] . '/appointments.inc.php');
 require_once($GLOBALS['srcdir'] . '/options.inc.php');
+
+use OpenEMR\Common\Crypto\CryptoGen;
+use OpenEMR\Common\Csrf\CsrfUtils;
+
+if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
+}
 
 $nextLocation = 0;      // offset to resume scanning
 $keyLocation  = false;  // offset of a potential {string} to replace
@@ -85,7 +83,6 @@ function dataFixup($data, $title = '')
 // Return a string naming all issues for the specified patient and issue type.
 function getIssues($type)
 {
-  // global $itemSeparator;
     $tmp = '';
     $lres = sqlStatement("SELECT title, comments FROM lists WHERE " .
     "pid = ? AND type = ? AND enddate IS NULL " .
@@ -210,10 +207,9 @@ function doSubs($s)
             $s = keyReplace($s, dataFixup(getIssues('medication'), xl('Medications')));
         } else if (keySearch($s, '{ProblemList}')) {
             $s = keyReplace($s, dataFixup(getIssues('medical_problem'), xl('Problem List')));
-        } // This tag indicates the fields from here until {/GRP} are a group of fields
-        // separated by semicolons.  Fields with no data are omitted, and fields with
-        // data are prepended with their field label from the form layout.
-        else if (keySearch($s, '{GRP}')) {
+        } else if (keySearch($s, '{GRP}')) { // This tag indicates the fields from here until {/GRP} are a group
+            // of fields separated by semicolons.  Fields with no data are omitted, and fields with
+            // data are prepended with their field label from the form layout.
             ++$groupLevel;
             $groupCount = 0;
             $s = keyReplace($s, '');
@@ -223,15 +219,15 @@ function doSubs($s)
             }
 
             $s = keyReplace($s, '');
-        } // This is how we specify the separator between group items in a way that
-        // is independent of the document format. Whatever is between {ITEMSEP} and
-        // {/ITEMSEP} is the separator string.  Default is "; ".
-        else if (preg_match('/^\{ITEMSEP\}(.*?)\{\/ITEMSEP\}/', substr($s, $keyLocation), $matches)) {
+        } else if (preg_match('/^\{ITEMSEP\}(.*?)\{\/ITEMSEP\}/', substr($s, $keyLocation), $matches)) {
+            // This is how we specify the separator between group items in a way that
+            // is independent of the document format. Whatever is between {ITEMSEP} and
+            // {/ITEMSEP} is the separator string.  Default is "; ".
             $itemSeparator = $matches[1];
             $keyLength = strlen($matches[0]);
             $s = keyReplace($s, '');
-        } // This handles keys like {LBFxxx:fieldid} for layout-based encounter forms.
-        else if (preg_match('/^\{(LBF\w+):(\w+)\}/', substr($s, $keyLocation), $matches)) {
+        } else if (preg_match('/^\{(LBF\w+):(\w+)\}/', substr($s, $keyLocation), $matches)) {
+            // This handles keys like {LBFxxx:fieldid} for layout-based encounter forms.
             $formname = $matches[1];
             $fieldid  = $matches[2];
             $keyLength = 3 + strlen($formname) + strlen($fieldid);
@@ -263,8 +259,8 @@ function doSubs($s)
             }
 
             $s = keyReplace($s, dataFixup($data, $title));
-        } // This handles keys like {DEM:fieldid} and {HIS:fieldid}.
-        else if (preg_match('/^\{(DEM|HIS):(\w+)\}/', substr($s, $keyLocation), $matches)) {
+        } else if (preg_match('/^\{(DEM|HIS):(\w+)\}/', substr($s, $keyLocation), $matches)) {
+            // This handles keys like {DEM:fieldid} and {HIS:fieldid}.
             $formname = $matches[1];
             $fieldid  = $matches[2];
             $keyLength = 3 + strlen($formname) + strlen($fieldid);
@@ -295,8 +291,6 @@ function doSubs($s)
     return $s;
 }
 
-// if (!acl_check('admin', 'super')) die(htmlspecialchars(xl('Not authorized')));
-
 // Get patient demographic info.
 $ptrow = sqlQuery("SELECT pd.*, " .
   "ur.fname AS ur_fname, ur.mname AS ur_mname, ur.lname AS ur_lname " .
@@ -317,7 +311,7 @@ if ($encounter) {
 
 $form_filename = $_REQUEST['form_filename'];
 $templatedir   = "$OE_SITE_DIR/documents/doctemplates";
-$templatepath  = "$templatedir/$form_filename";
+$templatepath  = "$templatedir/" . check_file_dir_name($form_filename);
 
 // Create a temporary file to hold the output.
 $fname = tempnam($GLOBALS['temporary_files_dir'], 'OED');
@@ -326,7 +320,7 @@ $fname = tempnam($GLOBALS['temporary_files_dir'], 'OED');
 $mimetype = 'application/octet-stream';
 $ext = strtolower(array_pop(explode('.', $filename)));
 if ('dotx' == $ext) {
-  // PHP does not seem to recognize this type.
+    // PHP does not seem to recognize this type.
     $mimetype = 'application/msword';
 } else if (function_exists('finfo_open')) {
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -364,9 +358,22 @@ if ('dotx' == $ext) {
     }
 }
 
+// Place file in variable.
+$fileData = file_get_contents($templatepath);
+
+// Decrypt file, if applicable.
+$cryptoGen = new CryptoGen();
+if ($cryptoGen->cryptCheckStandard($fileData)) {
+    $fileData = $cryptoGen->decryptStandard($fileData, null, 'database');
+}
+
+// Create a temporary file to hold the template.
+$dname = tempnam($GLOBALS['temporary_files_dir'], 'OED');
+file_put_contents($dname, $fileData);
+
 $zipin = new ZipArchive;
-if ($zipin->open($templatepath) === true) {
-  // Must be a zip archive.
+if ($zipin->open($dname) === true) {
+    // Must be a zip archive.
     $zipout = new ZipArchive;
     $zipout->open($fname, ZipArchive::OVERWRITE);
     for ($i = 0; $i < $zipin->numFiles; ++$i) {
@@ -379,11 +386,14 @@ if ($zipin->open($templatepath) === true) {
     $zipout->close();
     $zipin->close();
 } else {
-  // Not a zip archive.
-    $edata = file_get_contents($templatepath);
+    // Not a zip archive.
+    $edata = file_get_contents($dname);
     $edata = doSubs($edata);
     file_put_contents($fname, $edata);
 }
+
+// Remove the temporary template file.
+unlink($dname);
 
 // Compute a download name like "filename_lastname_pid.odt".
 $pi = pathinfo($form_filename);
@@ -395,14 +405,14 @@ if ($pi['extension'] !== '') {
 header('Content-Description: File Transfer');
 header('Content-Transfer-Encoding: binary');
 header('Expires: 0');
+header("Cache-control: private");
 header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
-header('Pragma: public');
-// attachment, not inline
-header("Content-Disposition: attachment; filename=\"$dlname\"");
-header("Content-Type: $mimetype");
+header("Content-Type: $mimetype; charset=utf-8");
 header("Content-Length: " . filesize($fname));
-ob_clean();
-flush();
-readfile($fname);
+header('Content-Disposition: attachment; filename="'. $dlname .'"');
+
+ob_end_clean();
+@readfile($fname) or error_log("Template temp file not found: " . $fname);
 
 unlink($fname);
+exit;

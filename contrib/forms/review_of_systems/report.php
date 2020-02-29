@@ -1,13 +1,13 @@
 <?php
-include_once("../../globals.php");
-include_once($GLOBALS["srcdir"]."/api.inc");
+require_once("../../globals.php");
+require_once($GLOBALS["srcdir"]."/api.inc");
 
 function review_of_systems_report($pid, $encounter, $cols, $id)
 {
     $count = 0;
     $data = formFetch("form_review_of_systems", $id);
-    $sql = "SELECT name from form_review_of_systems_checks where foreign_id = '" . add_escape_custom($id) . "'";
-    $results = sqlQ($sql);
+    $sql = "SELECT name from form_review_of_systems_checks where foreign_id = ?";
+    $results = sqlQ($sql, array($id));
     $data2 = array();
     while ($row = sqlFetchArray($results)) {
         $data2[] = $row['name'];
@@ -24,13 +24,13 @@ function review_of_systems_report($pid, $encounter, $cols, $id)
             if ($value == "on") {
                 $value = "yes";
             }
-    
+
             $key=ucwords(str_replace("_", " ", $key));
             if (is_numeric($key)) {
                 $key = "check";
             }
 
-            print "<td><span class=bold>$key: </span><span class=text>$value</span></td>";
+            print "<td><span class=bold>" . text($key) . ": </span><span class=text>" . text($value) . "</span></td>";
             $count++;
             if ($count == $cols) {
                 $count = 0;

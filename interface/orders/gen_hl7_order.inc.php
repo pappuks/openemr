@@ -36,6 +36,8 @@
 
 require_once("$webserver_root/custom/code_types.inc.php");
 
+use OpenEMR\Common\Logging\EventAuditLogger;
+
 function hl7Text($s)
 {
   // See http://www.interfaceware.com/hl7_escape_protocol.html:
@@ -211,10 +213,11 @@ function gen_hl7_order($orderid, &$out)
 
     $pcres = sqlStatement(
         "SELECT " .
-        "pc.procedure_code, pc.procedure_name, pc.procedure_order_seq, pc.diagnoses " .
-        "FROM procedure_order_code AS pc " .
+        "pc.procedure_code, pc.procedure_name, pc.procedure_order_seq, pc.diagnoses, pt.specimen " .
+        "FROM procedure_order_code AS pc, procedure_type as pt " .
         "WHERE " .
         "pc.procedure_order_id = ? AND " .
+        "pc.procedure_name = pt.name AND " .
         "pc.do_not_send = 0 " .
         "ORDER BY pc.procedure_order_seq",
         array($orderid)
@@ -376,6 +379,7 @@ function gen_hl7_order($orderid, &$out)
         $d1 .
         $d1 . hl7Time($porow['date_collected']) .     // Observation Date/Time
         str_repeat($d1, 8) .                          // OBR 8-15 not used
+        $dl . hl7Text($pcrow['specimen']) .           // Specimen source aka OBR-15
         $d1 . hl7Text($porow['docnpi']) .             // Physician ID
         $d2 . hl7Text($porow['doclname']) .         // Last Name
         $d2 . hl7Text($porow['docfname']) .         // First Name
@@ -523,14 +527,12 @@ function send_hl7_order($ppid, $out)
         } else {
             return xl('Cannot create file') . ' "' . "$filename" . '"';
         }
-    } // TBD: Insert "else if ($protocol == '???') {...}" to support other protocols.
-
-    else {
+    } else { // TBD: Insert "else if ($protocol == '???') {...}" to support other protocols.
         return xl('This protocol is not implemented') . ": '$protocol'";
     }
 
   // Falling through to here indicates success.
-    newEvent(
+    EventAuditLogger::instance()->newEvent(
         "proc_order_xmit",
         $_SESSION['authUser'],
         $_SESSION['authProvider'],

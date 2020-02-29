@@ -7,7 +7,7 @@
  * @author    Rod Roark <rod@sunsetsystems.com>
  * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2014 Rod Roark <rod@sunsetsystems.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2019 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
@@ -16,6 +16,8 @@ require_once("../globals.php");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/options.inc.php");
 require_once("portal.inc.php");
+
+use OpenEMR\Core\Header;
 
 $postid = intval($_REQUEST['postid']);
 $ptid   = intval($_REQUEST['ptid'  ]);
@@ -83,9 +85,7 @@ if ($postid) {
 ?>
 <html>
 <head>
-<?php html_header_show(); ?>
-<link rel=stylesheet href="<?php echo $css_header; ?>" type="text/css">
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.min.css">
+<?php Header::setupHeader('datetime-picker'); ?>
 
 <style>
 
@@ -94,10 +94,6 @@ tr.detail { font-size:10pt; background-color:#ddddff; }
 td input  { background-color:transparent; }
 
 </style>
-
-<script type="text/javascript" src="../../library/textformat.js?v=<?php echo $v_js_includes; ?>"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-1-7-2/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
 
 <script language="JavaScript">
 
@@ -182,7 +178,7 @@ function validate() {
  return true;
 }
 
-$(document).ready(function() {
+$(function() {
     $('.datepicker').datetimepicker({
         <?php $datetimepicker_timepicker = false; ?>
         <?php $datetimepicker_showseconds = false; ?>
@@ -318,7 +314,6 @@ if (empty($ptrow[$field_id])) {
 
 // hard code validation for old validation, in the new validation possible to add match rules
 <?php if ($GLOBALS['new_validate'] == 0) { ?>
-
 // Fix inconsistently formatted phone numbers from the database.
 var f = document.forms[0];
 if (f.form_phone_contact) phonekeyup(f.form_phone_contact,mypcc);

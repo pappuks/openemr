@@ -21,10 +21,8 @@
 
 namespace PrescriptionTemplates\Controller;
 
-use Zend\Mvc\Controller\AbstractActionController;
-use Zend\View\Model\ViewModel;
-
-require_once($GLOBALS['fileroot'] . "/library/classes/Prescription.class.php");
+use Laminas\Mvc\Controller\AbstractActionController;
+use Laminas\View\Model\ViewModel;
 
 class PrescriptionTemplatesController extends AbstractActionController
 {

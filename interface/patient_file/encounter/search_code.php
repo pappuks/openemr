@@ -1,11 +1,20 @@
 <?php
+/**
+ * search_code.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
-////////////////////////////////////////////////////////////////////////////////
-// THIS MODULE REPLACES cptcm_codes.php, hcpcs_codes.php AND icd9cm_codes.php.
-////////////////////////////////////////////////////////////////////////////////
 
 require_once("../../globals.php");
 require_once("../../../custom/code_types.inc.php");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 //the maximum number of records to pull out with the search:
 $M = 30;
@@ -18,11 +27,7 @@ $code_type = $_GET['type'];
 
 <html>
 <head>
-<?php html_header_show();?>
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
-
-<!-- add jQuery support -->
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/manual-added-packages/jquery-min-1-2-2/index.js"></script>
+<?php Header::setupHeader(); ?>
 
 </head>
 <body class="body_bottom">
@@ -33,12 +38,12 @@ $code_type = $_GET['type'];
 
 <td valign=top>
 
-<form name="search_form" id="search_form" method="post" action="search_code.php?type=<?php echo attr(urlencode($code_type)); ?>">
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<form name="search_form" id="search_form" method="post" action="search_code.php?type=<?php echo attr_url($code_type); ?>">
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <input type="hidden" name="mode" value="search">
 
-<span class="title"><?php echo text($code_type); ?> <?php echo xlt('Codes'); ?></span><br>
+<span class="title"><?php echo text($code_type); ?> <?php echo xlt('Codes'); ?></span><br />
 
 <input type="textbox" id="text" name="text" size=15>
 
@@ -49,8 +54,8 @@ $code_type = $_GET['type'];
 
 <?php
 if (isset($_POST["mode"]) && $_POST["mode"] == "search" && $_POST["text"] == "") {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     echo "<div id='resultsummary' style='background-color:lightgreen;'>";
@@ -58,8 +63,8 @@ if (isset($_POST["mode"]) && $_POST["mode"] == "search" && $_POST["text"] == "")
 }
 
 if (isset($_POST["mode"]) && $_POST["mode"] == "search" && $_POST["text"] != "") {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
   // $sql = "SELECT * FROM codes WHERE (code_text LIKE '%" . $_POST["text"] .
@@ -94,49 +99,49 @@ if (isset($_POST["mode"]) && $_POST["mode"] == "search" && $_POST["text"] != "")
         }
 
         echo "</div>";
-?>
+        ?>
 <div id="results">
 <table><tr class='text'><td valign='top'>
-<?php
-$count = 0;
-$total = 0;
+        <?php
+        $count = 0;
+        $total = 0;
 
-if ($result) {
-    foreach ($result as $iter) {
-        if ($count == $N) {
-            echo "</td><td valign='top'>\n";
-            $count = 0;
+        if ($result) {
+            foreach ($result as $iter) {
+                if ($count == $N) {
+                    echo "</td><td valign='top'>\n";
+                    $count = 0;
+                }
+
+                echo "<div class='oneresult' style='padding: 3px 0px 3px 0px;'>";
+                echo "<a target='" . xla('Diagnosis') . "' href='diagnosis.php?mode=add" .
+                    "&type="     . attr_url($code_type) .
+                    "&code="     . attr_url($iter["code"]) .
+                    "&modifier=" . attr_url($iter["modifier"]) .
+                    "&units="    . attr_url($iter["units"]) .
+                    // "&fee="      . attr_url($iter["fee"]) .
+                    "&fee="      . attr_url($iter['pr_price']) .
+                    "&text="     . attr_url($iter["code_text"]) .
+                    "&csrf_token_form=" . attr_url(CsrfUtils::collectCsrfToken()) .
+                    "' onclick='top.restoreSession()'>";
+                echo ucwords("<b>" . text(strtoupper($iter["code"])) . "&nbsp;" . text($iter['modifier']) .
+                    "</b>" . " " . text(strtolower($iter["code_text"])));
+                echo "</a><br />\n";
+                echo "</div>";
+
+                $count++;
+                $total++;
+
+                if ($total == $M) {
+                    echo "</span><span class='alert-custom'>" . xlt('Some codes were not displayed.') . "</span>\n";
+                    break;
+                }
+            }
         }
-
-        echo "<div class='oneresult' style='padding: 3px 0px 3px 0px;'>";
-        echo "<a target='" . xla('Diagnosis') . "' href='diagnosis.php?mode=add" .
-            "&type="     . attr(urlencode($code_type)) .
-            "&code="     . attr(urlencode($iter{"code"})) .
-            "&modifier=" . attr(urlencode($iter{"modifier"})) .
-            "&units="    . attr(urlencode($iter{"units"})) .
-            // "&fee="      . attr(urlencode($iter{"fee"})) .
-            "&fee="      . attr(urlencode($iter['pr_price'])) .
-            "&text="     . attr(urlencode($iter{"code_text"})) .
-            "&csrf_token_form=" . attr(urlencode(collectCsrfToken())) .
-            "' onclick='top.restoreSession()'>";
-        echo ucwords("<b>" . text(strtoupper($iter{"code"})) . "&nbsp;" . text($iter['modifier']) .
-            "</b>" . " " . text(strtolower($iter{"code_text"})));
-        echo "</a><br>\n";
-        echo "</div>";
-
-        $count++;
-        $total++;
-
-        if ($total == $M) {
-            echo "</span><span class='alert-custom'>" . xlt('Some codes were not displayed.') . "</span>\n";
-            break;
-        }
-    }
-}
-?>
+        ?>
 </td></tr></table>
 </div>
-<?php
+        <?php
     }
 }
 ?>
@@ -152,12 +157,12 @@ if ($result) {
 
 // jQuery stuff to make the page a little easier to use
 
-$(document).ready(function(){
-    $("#text").focus();
-    $(".oneresult").mouseover(function() { $(this).toggleClass("highlight"); });
-    $(".oneresult").mouseout(function() { $(this).toggleClass("highlight"); });
+$(function (){
+    $("#text").trigger("focus");
+    $(".oneresult").on("mouseover", function() { $(this).toggleClass("highlight"); });
+    $(".oneresult").on("mouseout", function() { $(this).toggleClass("highlight"); });
     //$(".oneresult").click(function() { SelectPatient(this); });
-    $("#search_form").submit(function() { SubmitForm(this); });
+    $("#search_form").on("submit", function() { SubmitForm(this); });
 });
 
 // show the 'searching...' status and submit the form

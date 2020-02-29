@@ -1,29 +1,18 @@
 <?php
-// +-----------------------------------------------------------------------------+
-// Copyright (C) 2010 Z&H Consultancy Services Private Limited <sam@zhservices.com>
-//
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-//
-// A copy of the GNU General Public License is included along with this program:
-// openemr/interface/login/GnuGPL.html
-// For more information write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-//
-// Author:   Eldho Chacko <eldho@zhservices.com>
-//           Paul Simon K <paul@zhservices.com>
-//
-// +------------------------------------------------------------------------------+
+/**
+ *
+ * @package OpenEMR
+ * @author Eldho Chacko <eldho@zhservices.com>
+ * @author Paul Simon K <paul@zhservices.com>
+ * @author Stephen Waite <stephen.waite@cmsvt.com>
+ * @copyright Copyright (c) 2010 Z&H Consultancy Services Private Limited <sam@zhservices.com>
+ * @copyright Copyright (c) 2018 Stephen Waite <stephen.waite@cmsvt.com>
+ * @link https://www.open-emr.org
+ * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
+use OpenEMR\Billing\SLEOB;
+use OpenEMR\Common\Logging\EventAuditLogger;
 
 // Post a payment to the payments table.
 //
@@ -119,7 +108,7 @@ function DistributionInsert($CountRow, $created_time, $user_id)
 
         sqlBeginTrans();
         $sequence_no = sqlQuery("SELECT IFNULL(MAX(sequence_no),0) + 1 AS increment FROM ar_activity WHERE pid = ? AND encounter = ?", array(trim(formData('hidden_patient_code')), trim(formData("HiddenEncounter$CountRow"))));
-        sqlInsert("insert into ar_activity set "    .
+        sqlStatement("insert into ar_activity set "    .
         "pid = '"       . trim(formData('hidden_patient_code')) .
         "', encounter = '"     . trim(formData("HiddenEncounter$CountRow"))  .
         "', sequence_no = '"     . $sequence_no['increment']  .
@@ -143,7 +132,7 @@ function DistributionInsert($CountRow, $created_time, $user_id)
     if (isset($_POST["Deductible$CountRow"]) && $_POST["Deductible$CountRow"]*1>0) {
          sqlBeginTrans();
          $sequence_no = sqlQuery("SELECT IFNULL(MAX(sequence_no),0) + 1 AS increment FROM ar_activity WHERE pid = ? AND encounter = ?", array(trim(formData('hidden_patient_code')), trim(formData("HiddenEncounter$CountRow"))));
-         sqlInsert("insert into ar_activity set "    .
+        sqlStatement("insert into ar_activity set "    .
         "pid = '"       . trim(formData('hidden_patient_code')) .
         "', encounter = '"     . trim(formData("HiddenEncounter$CountRow"))  .
         "', sequence_no = '"     . $sequence_no['increment']  .
@@ -167,7 +156,7 @@ function DistributionInsert($CountRow, $created_time, $user_id)
     if (isset($_POST["Takeback$CountRow"]) && $_POST["Takeback$CountRow"]*1>0) {
          sqlBeginTrans();
          $sequence_no = sqlQuery("SELECT IFNULL(MAX(sequence_no),0) + 1 AS increment FROM ar_activity WHERE pid = ? AND encounter = ?", array(trim(formData('hidden_patient_code')), trim(formData("HiddenEncounter$CountRow"))));
-         sqlInsert("insert into ar_activity set "    .
+        sqlStatement("insert into ar_activity set "    .
         "pid = '"       . trim(formData('hidden_patient_code')) .
         "', encounter = '"     . trim(formData("HiddenEncounter$CountRow"))  .
         "', sequence_no = '"     . $sequence_no['increment']  .
@@ -190,7 +179,7 @@ function DistributionInsert($CountRow, $created_time, $user_id)
     if (isset($_POST["FollowUp$CountRow"]) && $_POST["FollowUp$CountRow"]=='y') {
          sqlBeginTrans();
          $sequence_no = sqlQuery("SELECT IFNULL(MAX(sequence_no),0) + 1 AS increment FROM ar_activity WHERE pid = ? AND encounter = ?", array(trim(formData('hidden_patient_code')), trim(formData("HiddenEncounter$CountRow"))));
-         sqlInsert("insert into ar_activity set "    .
+         sqlStatement("insert into ar_activity set "    .
         "pid = '"       . trim(formData('hidden_patient_code')) .
         "', encounter = '"     . trim(formData("HiddenEncounter$CountRow"))  .
         "', sequence_no = '"     . $sequence_no['increment']  .
@@ -231,9 +220,9 @@ function DistributionInsert($CountRow, $created_time, $user_id)
                     ++$new_payer_type;
                 }
 
-                  $new_payer_id = arGetPayerID(trim(formData('hidden_patient_code')), $date_of_service, $new_payer_type);
+                  $new_payer_id = SLEOB::arGetPayerID(trim(formData('hidden_patient_code')), $date_of_service, $new_payer_type);
                 if ($new_payer_id>0) {
-                        arSetupSecondary(trim(formData('hidden_patient_code')), trim(formData("HiddenEncounter$CountRow")), 0);
+                        SLEOB::arSetupSecondary(trim(formData('hidden_patient_code')), trim(formData("HiddenEncounter$CountRow")), 0);
                 }
 
                     //-----------------------------------
@@ -247,7 +236,7 @@ function DistributionInsert($CountRow, $created_time, $user_id)
   //
 function row_delete($table, $where)
 {
-    $tres = sqlStatement("SELECT * FROM $table WHERE $where");
+    $tres = sqlStatement("SELECT * FROM " . escape_table_name($table) . " WHERE $where");
     $count = 0;
     while ($trow = sqlFetchArray($tres)) {
         $logstring = "";
@@ -263,12 +252,12 @@ function row_delete($table, $where)
             $logstring .= $key . "='" . addslashes($value) . "'";
         }
 
-        newEvent("delete", $_SESSION['authUser'], $_SESSION['authProvider'], 1, "$table: $logstring");
+        EventAuditLogger::instance()->newEvent("delete", $_SESSION['authUser'], $_SESSION['authProvider'], 1, "$table: $logstring");
         ++$count;
     }
 
     if ($count) {
-        $query = "DELETE FROM $table WHERE $where";
+        $query = "DELETE FROM " . escape_table_name($table) . " WHERE $where";
         sqlStatement($query);
     }
 }

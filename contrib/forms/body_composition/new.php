@@ -1,26 +1,25 @@
 <?php
-//////////////////////////////////////////////////////////////////////
-// ------------------ DO NOT MODIFY VIEW.PHP !!! ---------------------
-// View.php is an exact duplicate of new.php.  If you wish to make
-// any changes, then change new.php and either (recommended) make
-// view.php a symbolic link to new.php, or copy new.php to view.php.
-//
-// And if you check in a change to either module, be sure to check
-// in the other (identical) module also.
-//
-// This nonsense will go away if we ever move to subversion.
-//////////////////////////////////////////////////////////////////////
+/**
+ * body_composition new.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @author    Daniel Ehrlich <daniel.ehrlich1@gmail.com>
+ * @copyright Copyright (c) 2006 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Daniel Ehrlich <daniel.ehrlich1@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
-// Copyright (C) 2006 Rod Roark <rod@sunsetsystems.com>
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
 
 require_once("../../globals.php");
 require_once("$srcdir/api.inc");
 require_once("$srcdir/forms.inc");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 $scale_file_name = '/tmp/tanita_scale.txt';
 $scale_file_age = -1;
@@ -56,8 +55,8 @@ $formid = $_GET['id'];
 // If Save was clicked, save the info.
 //
 if ($_POST['bn_save']) {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
  // If updating an existing form...
@@ -70,9 +69,7 @@ if ($_POST['bn_save']) {
         sqlStatement($query, array(rbvalue('form_body_type'),  trim($_POST['form_height']), trim($_POST['form_weight']), trim($_POST['form_bmi']),
          trim($_POST['form_bmr']), trim($_POST['form_impedance']), trim($_POST['form_fat_pct']), trim($_POST['form_fat_mass']),  trim($_POST['form_ffm']),
          trim($_POST['form_tbw']), trim($_POST['form_other']), $formid ));
-    } // If adding a new form...
- //
-    else {
+    } else { // If adding a new form...
         $query = 'INSERT INTO form_body_composition (
          body_type, height, weight, bmi, bmr, impedance, fat_pct, fat_mass, ffm, tbw, other
          ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
@@ -113,16 +110,13 @@ if ($formid) {
 ?>
 <html>
 <head>
-<?php html_header_show();?>
-<link rel=stylesheet href="<?php echo $css_header;?>" type="text/css">
-<script language="JavaScript">
-</script>
+    <?php Header::setupHeader(); ?>
 </head>
 
 <body <?php echo $top_bg_line;?> topmargin="0" rightmargin="0" leftmargin="2" bottommargin="0" marginwidth="2" marginheight="0">
-<form method="post" action="<?php echo $rootdir ?>/forms/body_composition/new.php?id=<?php echo attr($formid) ?>"
+<form method="post" action="<?php echo $rootdir ?>/forms/body_composition/new.php?id=<?php echo attr_url($formid) ?>"
  onsubmit="return top.restoreSession()">
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <center>
 

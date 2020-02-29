@@ -1,13 +1,19 @@
 <?php
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
+/**
+ * load_form.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @author    Jerry Padgett <sjpadgett@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2019 Jerry Padgett <sjpadgett@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
-$special_timeout = 3600;
-include_once("../../globals.php");
+require_once("../../globals.php");
 if (substr($_GET["formname"], 0, 3) === 'LBF') {
-  // Use the List Based Forms engine for all LBFxxxxx forms.
+    // Use the List Based Forms engine for all LBFxxxxx forms.
     include_once("$incdir/forms/LBF/new.php");
 } else {
     if ((!empty($_GET['pid'])) && ($_GET['pid'] > 0)) {
@@ -15,8 +21,12 @@ if (substr($_GET["formname"], 0, 3) === 'LBF') {
         $encounter = $_GET['encounter'];
     }
 
-  // ensure the path variable has no illegal characters
+    // ensure the path variable has no illegal characters
     check_file_dir_name($_GET["formname"]);
 
     include_once("$incdir/forms/" . $_GET["formname"] . "/new.php");
 }
+
+if (!empty($GLOBALS['text_templates_enabled'])) { ?>
+    <script type="text/javascript" src="<?php echo $GLOBALS['web_root'] ?>/library/js/CustomTemplateLoader.js"></script>
+<?php } ?>

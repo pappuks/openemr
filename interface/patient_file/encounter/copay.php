@@ -1,5 +1,19 @@
 <?php
-include_once("../../globals.php");
+/**
+ * copay.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
+
+require_once("../../globals.php");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 // This may be more appropriate to move to the library
 // later
@@ -34,8 +48,7 @@ document.copay_form.codeH.value="";
 </script>
 
 
-<?php html_header_show();?>
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
+<?php Header::setupHeader(); ?>
 </head>
 <body class="body_bottom">
 
@@ -46,25 +59,25 @@ document.copay_form.codeH.value="";
 
 <dl>
 
-<form method='post' name='copay_form' action="diagnosis.php?mode=add&type=COPAY&text=copay&csrf_token_form=<?php echo attr(urlencode(collectCsrfToken())); ?>"
+<form method='post' name='copay_form' action="diagnosis.php?mode=add&type=COPAY&text=copay&csrf_token_form=<?php echo attr_url(CsrfUtils::collectCsrfToken()); ?>"
  target='Diagnosis' onsubmit='return top.restoreSession()'>
 
 <dt><span class=title><?php echo xlt('Copay'); ?></span></dt>
 
-<br>
+<br />
 <input type=hidden name=code>
 <span class='text'><?php echo xlt('$'); ?> </span><input type='entry' name='codeH' value='' size='5' />
 
-<input type="SUBMIT" value="<?php echo xla('Save');?>" onclick="cleartext('clear')"><br><br>
+<input type="SUBMIT" value="<?php echo xla('Save');?>" onclick="cleartext('clear')"><br /><br />
 
 
 <div<?php if ($GLOBALS['simplified_copay']) {
     echo " style='display:none;'";
-} ?>>
+    } ?>>
 <input type="RADIO" name="payment_method" value="cash" checked><?php echo xlt('cash'); ?>
 <input type="RADIO" name="payment_method" value="credit card"><?php echo xlt('credit'); ?>
 <input type="RADIO" name="payment_method" value="check"><?php echo xlt('check'); ?>
-<input type="RADIO" name="payment_method" value="other"><?php echo xlt('other'); ?><br><br>
+<input type="RADIO" name="payment_method" value="other"><?php echo xlt('other'); ?><br /><br />
 <input type="RADIO" name="payment_method" value="insurance"><?php echo xlt('insurance'); ?>
 <?php
 if ($ret=getInsuranceCompanies($pid)) {
@@ -83,7 +96,7 @@ if ($ret=getInsuranceCompanies($pid)) {
     }
 }
 ?>
-<br><br>
+<br /><br />
 <input type="RADIO" name="payment_method" value="write off"><?php echo xlt('write off'); ?>
 
 </div>

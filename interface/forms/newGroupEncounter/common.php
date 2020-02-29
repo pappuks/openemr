@@ -8,7 +8,7 @@
  * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2016 Shachar Zilbershlag <shaharzi@matrix.co.il>
  * @copyright Copyright (c) 2016 Amiel Elboim <amielel@matrix.co.il>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2017-2019 Brady Miller <brady.g.miller@gmail.com>
  * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
@@ -17,6 +17,9 @@ require_once("$srcdir/api.inc");
 require_once("$srcdir/group.inc");
 require_once("$srcdir/classes/POSRef.class.php");
 
+use OpenEMR\Common\Acl\AclExtended;
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 use OpenEMR\Services\FacilityService;
 
@@ -32,7 +35,7 @@ if ($viewmode) {
     $id = (isset($_REQUEST['id'])) ? $_REQUEST['id'] : '';
     $result = sqlQuery("SELECT * FROM form_groups_encounter WHERE id = ?", array($id));
     $encounter = $result['encounter'];
-    if ($result['sensitivity'] && !acl_check('sensitivities', $result['sensitivity'])) {
+    if ($result['sensitivity'] && !AclMain::aclCheckCore('sensitivities', $result['sensitivity'])) {
         echo "<body>\n<html>\n";
         echo "<p>" . xlt('You are not authorized to see this encounter.') . "</p>\n";
         echo "</body>\n</html>\n";
@@ -83,17 +86,17 @@ require_once($GLOBALS['srcdir'] . "/validation/validation_script.js.php"); ?>
 */
 
     <?php
- //Gets validation rules from Page Validation list.
- //Note that for technical reasons, we are bypassing the standard validateUsingPageRules() call.
+    //Gets validation rules from Page Validation list.
+    //Note that for technical reasons, we are bypassing the standard validateUsingPageRules() call.
     $collectthis = collectValidationPageRules("/interface/forms/newGroupEncounter/common.php");
     if (empty($collectthis)) {
          $collectthis = "undefined";
     } else {
-         $collectthis = $collectthis["new-encounter-form"]["rules"];
+         $collectthis = json_sanitize($collectthis["new-encounter-form"]["rules"]);
     }
     ?>
- var collectvalidation = <?php echo($collectthis); ?>;
- $(document).ready(function(){
+ var collectvalidation = <?php echo $collectthis; ?>;
+ $(function(){
    window.saveClicked = function(event) {
      var submit = submitme(1, event, 'new-encounter-form', collectvalidation);
      if (submit) {
@@ -113,7 +116,7 @@ require_once($GLOBALS['srcdir'] . "/validation/validation_script.js.php"); ?>
  });
 
 function bill_loc(){
-var pid=<?php echo attr($pid);?>;
+var pid=<?php echo js_escape($pid);?>;
 var dte=document.getElementById('form_date').value;
 var facility=document.forms[0].facility_id.value;
 ajax_bill_loc(pid,dte,facility);
@@ -122,21 +125,7 @@ ajax_bill_loc(pid,dte,facility);
 // Handler for Cancel clicked when creating a new encounter.
 // Show demographics or encounters list depending on what frame we're in.
 function cancelClickedNew() {
-    if (top.tab_mode) {
-        window.parent.left_nav.loadFrame('ens1', window.name, 'patient_file/history/encounters.php');
-    }
-    var target = window;
-    while (target != top) {
-        if (target.name == 'RBot') {
-            target.parent.left_nav.loadFrame('ens1', window.name, 'patient_file/history/encounters.php');
-            break;
-        }
-        else if (target.name == 'RTop') {
-            target.parent.left_nav.loadFrame('dem1', window.name, 'patient_file/summary/demographics.php');
-            break;
-        }
-        target = target.parent;
-    }
+    window.parent.left_nav.loadFrame('ens1', window.name, 'patient_file/history/encounters.php');
     return false;
 }
 
@@ -172,7 +161,7 @@ $help_icon = '';
 <body class="body_top" <?php echo $body_javascript;?>>
 <div class="container">
     <div class="row">
-        <div class="col-xs-12">
+        <div class="col-12">
             <!-- Required for the popup date selectors -->
             <div id="overDiv" style="position:absolute; visibility:hidden; z-index:1000;"></div>
             <div class="">
@@ -183,7 +172,7 @@ $help_icon = '';
         </div>
     </div>
     <div class="row">
-        <div class="col-xs-12">
+        <div class="col-12">
             <form id="new-encounter-form" method='post' action="<?php echo $rootdir ?>/forms/newGroupEncounter/save.php" name='new_encounter'>
                 <?php if ($viewmode) { ?>
                     <input type=hidden name='mode' value='update'>
@@ -192,6 +181,7 @@ $help_icon = '';
                     <input type='hidden' name='mode' value='new'>
                 <?php } ?>
                 <fieldset>
+                    <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
                     <legend><?php echo xlt('Visit Details')?></legend>
                     <div id = "visit-details">
                         <div class="form-group ">
@@ -225,17 +215,17 @@ $help_icon = '';
                                 </select>
                             </div>
                             <?php
-                            $sensitivities = acl_get_sensitivities();
+                            $sensitivities = AclExtended::aclGetSensitivities();
                             if ($sensitivities && count($sensitivities)) {
                                 usort($sensitivities, "sensitivity_compare");
-                            ?>
+                                ?>
                             <label for="pc_catid" class="control-label col-sm-2 oe-text-to-right"><?php echo xlt('Sensitivity'); ?>:</label>
                             <div class="col-sm-3">
                                 <select name='form_sensitivity' id='form_sensitivity' class='form-control col-sm-12' >
                                     <?php
                                     foreach ($sensitivities as $value) {
                                         // Omit sensitivities to which this user does not have access.
-                                        if (acl_check('sensitivities', $value[1])) {
+                                        if (AclMain::aclCheckCore('sensitivities', $value[1])) {
                                             echo "       <option value='" . attr($value[1]) . "'";
                                             if ($viewmode && $result['sensitivity'] == $value[1]) {
                                                 echo " selected";
@@ -250,16 +240,16 @@ $help_icon = '';
                                         echo " selected";
                                     }
 
-                                    echo ">" . xlt('None'). "</option>\n";
+                                    echo ">" . xlt('None{{Sensitivity}}'). "</option>\n";
                                     ?>
                                 </select>
                                 <?php
                             } else {
-                                    ?>
+                                ?>
 
                                     <?php
                             }
-                                ?>
+                            ?>
                             </div>
                             <div class="clearfix"></div>
                         </div>
@@ -267,7 +257,7 @@ $help_icon = '';
                             <label for='form_date' class="control-label col-sm-2 oe-text-to-right"><?php echo xlt('Date of Service'); ?>:</label>
                             <div class="col-sm-3">
                                 <input type='text' class='form-control datepicker col-sm-12' name='form_date' id='form_date' <?php echo $disabled ?>
-                                       value='<?php echo $viewmode ? attr(oeFormatShortDate(substr($result['date'], 0, 10))) : oeFormatShortDate(date('Y-m-d')); ?>'
+                                       value='<?php echo $viewmode ? attr(oeFormatShortDate(substr($result['date'], 0, 10))) : attr(oeFormatShortDate(date('Y-m-d'))); ?>'
                                        title='<?php echo xla('Date of service'); ?>'/>
                             </div>
 
@@ -364,14 +354,14 @@ $help_icon = '';
                 <fieldset>
                     <legend><?php echo xlt('Reason for Visit')?></legend>
                     <div class="form-group">
-                        <div class="col-sm-10 col-sm-offset-1">
+                        <div class="col-sm-10 offset-sm-1">
                             <textarea name="reason" id="reason" class="form-control" cols="80" rows="4" ><?php echo $viewmode ? text($result['reason']) : text($GLOBALS['default_chief_complaint']); ?></textarea>
                         </div>
                     </div>
                 </fieldset>
                 <div class="form-group clearfix">
                     <div class="col-sm-12 text-left position-override">
-                        <button type="button" class="btn btn-default btn-save" onclick="top.restoreSession(); saveClicked(undefined);"><?php echo xlt('Save');?></button>
+                        <button type="button" class="btn btn-secondary btn-save" onclick="top.restoreSession(); saveClicked(undefined);"><?php echo xlt('Save');?></button>
                         <?php if ($viewmode || empty($_GET["autoloaded"])) { // not creating new encounter ?>
                             <button type="button" class="btn btn-link btn-cancel btn-separate-left" onClick="return cancelClickedOld()"><?php echo xlt('Cancel');?></button>
                         <?php } else { // not $viewmode ?>
@@ -394,19 +384,19 @@ $help_icon = '';
 <?php
 if (!$viewmode) { ?>
  function duplicateVisit(enc, datestr) {
-    if (!confirm('<?php echo xls("A visit already exists for this group today. Click Cancel to open it, or OK to proceed with creating a new one.") ?>')) {
+    if (!confirm(<?php echo xlj("A visit already exists for this group today. Click Cancel to open it, or OK to proceed with creating a new one.") ?>)) {
             // User pressed the cancel button, so re-direct to today's encounter
             top.restoreSession();
             parent.left_nav.setEncounter(datestr, enc, window.name);
-            parent.left_nav.loadFrame('enc2', window.name, 'patient_file/encounter/encounter_top.php?set_encounter=' + enc);
+            parent.left_nav.loadFrame('enc2', window.name, 'patient_file/encounter/encounter_top.php?set_encounter=' + encodeURIComponent(enc));
             return;
         }
         // otherwise just continue normally
     }
-<?php
+    <?php
 
   // Search for an encounter from today
-  $erow = sqlQuery("SELECT fe.encounter, fe.date " .
+    $erow = sqlQuery("SELECT fe.encounter, fe.date " .
     "FROM form_groups_encounter AS fe, forms AS f WHERE " .
     "fe.group_id = ? " .
     " AND fe.date >= ? " .
@@ -415,11 +405,11 @@ if (!$viewmode) { ?>
     "f.formdir = 'newGroupEncounter' AND f.form_id = fe.id AND f.deleted = 0 " .
     "ORDER BY fe.encounter DESC LIMIT 1", array($therapy_group,date('Y-m-d 00:00:00'),date('Y-m-d 23:59:59')));
 
-if (!empty($erow['encounter'])) {
-    // If there is an encounter from today then present the duplicate visit dialog
-    echo "duplicateVisit('" . $erow['encounter'] . "', '" .
-        text(oeFormatShortDate(substr($erow['date'], 0, 10))) . "');\n";
-}
+    if (!empty($erow['encounter'])) {
+        // If there is an encounter from today then present the duplicate visit dialog
+        echo "duplicateVisit(" . js_escape($erow['encounter']) . ", " .
+        js_escape(oeFormatShortDate(substr($erow['date'], 0, 10))) . ");\n";
+    }
 }
 ?>
 </script>

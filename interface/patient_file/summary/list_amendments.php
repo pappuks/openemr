@@ -2,31 +2,27 @@
 /**
  * List Amendments
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Hema Bandaru <hemab@drcloudemr.com>
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Hema Bandaru <hemab@drcloudemr.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2014 Ensoftek
- * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
-include_once("../../globals.php");
-include_once("$srcdir/options.inc.php");
+require_once("../../globals.php");
+require_once("$srcdir/options.inc.php");
+
+use OpenEMR\Core\Header;
 
 ?>
 
 <html>
 <head>
-<?php html_header_show();?>
 
-<!-- supporting javascript code -->
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery/dist/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/textformat.js?v=<?php echo $v_js_includes; ?>"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
-
-
-<!-- page styles -->
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
+<?php Header::setupHeader(); ?>
 
 <style>
 .highlight {
@@ -45,12 +41,12 @@ tr.selected {
         });
 
         if ( amendments == '' ) {
-            alert("<?php echo xls('Select amendments to print'); ?>");
+            alert(<?php echo xlj('Select amendments to print'); ?>);
             return;
         }
 
         // Call the function to print
-        var url = "print_amendments.php?ids=" + amendments;
+        var url = "print_amendments.php?ids=" + encodeURIComponent(amendments);
         window.open(url);
     }
 
@@ -72,9 +68,9 @@ tr.selected {
     $query = "SELECT * FROM amendments WHERE pid = ? ORDER BY amendment_date DESC";
     $resultSet = sqlStatement($query, array($pid));
 if (sqlNumRows($resultSet)) { ?>
-            <table cellspacing="0" cellpadding="0" style="width:100%">
+            <table class="w-100" cellspacing="0" cellpadding="0">
                 <tr>
-                    <td><a href="javascript:checkForAmendments();" class="css_button"><span><?php echo xlt("Print Amendments"); ?></span></a></td>
+                    <td><a href="javascript:checkForAmendments();" class="btn btn-primary"><span><?php echo xlt("Print Amendments"); ?></span></a></td>
                     <td align="right">
                         <a href="#" class="small" onClick="checkUncheck(1);"><span><?php echo xlt('Check All');?></span></a> |
                         <a href="#" class="small" onClick="checkUncheck(0);"><span><?php echo xlt('Clear All');?></span></a>
@@ -82,8 +78,8 @@ if (sqlNumRows($resultSet)) { ?>
                 </tr>
             </table>
         <div id="patient_stats">
-            <br>
-        <table border=0 cellpadding=0 cellspacing=0 style="margin-bottom:1em;">
+            <br />
+        <table border='0' cellpadding='0' cellspacing='0' style="margin-bottom:1em;">
 
         <tr class='head'>
             <th style="width:5%"></th>
@@ -94,8 +90,8 @@ if (sqlNumRows($resultSet)) { ?>
         </tr>
 
         <?php while ($row = sqlFetchArray($resultSet)) {
-            $amendmentLink = "<a href=add_edit_amendments.php?id=" . attr($row['amendment_id']) . ">" . text(oeFormatShortDate($row['amendment_date'])) . "</a>";
-        ?>
+            $amendmentLink = "<a href='add_edit_amendments.php?id=" . attr_url($row['amendment_id']) . "'>" . text(oeFormatShortDate($row['amendment_date'])) . "</a>";
+            ?>
             <tr class="amendmentrow" id="<?php echo attr($row['amendment_id']); ?>">
                 <td><input id="check_list[]" name="check_list[]" type="checkbox" value="<?php echo attr($row['amendment_id']); ?>"></td>
                 <td class=text><?php echo $amendmentLink; ?> </td>
@@ -108,7 +104,7 @@ if (sqlNumRows($resultSet)) { ?>
         </div>
 <?php } else { ?>
         <span style="color:red">
-            <br>
+            <br />
             <?php echo xlt("No amendment requests available"); ?>
         </span>
 <?php } ?>

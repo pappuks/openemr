@@ -1,5 +1,22 @@
 <?php
+/**
+ * new_patient_save.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
+
 require_once("../globals.php");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+
+if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
+}
 
 // Validation for non-unique external patient identifier.
 if (!empty($_POST["pubpid"])) {
@@ -132,11 +149,11 @@ if ($_POST['form_create']) {
 <script language="Javascript">
 <?php
 if ($alertmsg) {
-    echo "alert('" . addslashes($alertmsg) . "');\n";
+    echo "alert(" . js_escape($alertmsg) . ");\n";
 }
 
   echo "window.location='$rootdir/patient_file/summary/demographics.php?" .
-    "set_pid=" . attr($pid) . "&is_new=1';\n";
+    "set_pid=" . attr_url($pid) . "&is_new=1';\n";
 ?>
 </script>
 

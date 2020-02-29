@@ -2,36 +2,28 @@
 /**
  * interface/forms/group_attendance/new.php
  *
- * Copyright (C) 2016 Shachar Zilbershlag <shaharzi@matrix.co.il>
- * Copyright (C) 2016 Amiel Elboim <amielel@matrix.co.il>
- *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 3
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
- * @package OpenEMR
- * @author  Shachar Zilbershlag <shaharzi@matrix.co.il>
- * @author  Amiel Elboim <amielel@matrix.co.il>
- * @link    http://www.open-emr.org
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Shachar Zilbershlag <shaharzi@matrix.co.il>
+ * @author    Amiel Elboim <amielel@matrix.co.il>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2016 Shachar Zilbershlag <shaharzi@matrix.co.il>
+ * @copyright Copyright (c) 2016 Amiel Elboim <amielel@matrix.co.il>
+ * @copyright Copyright (c) 2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
-
-
-require_once("../../globals.php");
+require_once(__DIR__ . "/../../globals.php");
 require_once("functions.php");
 require_once(dirname(__FILE__) . "/../../../library/group.inc");
 
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Core\Header;
+
 //Check acl
-$can_view = acl_check("groups", "gadd", false, 'view');
-$can_edit = acl_check("groups", "gadd", false, 'write');
+$can_view = AclMain::aclCheckCore("groups", "gadd", false, 'view');
+$can_edit = AclMain::aclCheckCore("groups", "gadd", false, 'write');
 
 if (!$can_view && !$can_edit) {
     formJump();
@@ -64,26 +56,17 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
 }
 
 ?>
-
 <html>
 
 <head>
-    <?php html_header_show();?>
 
-    <link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
-    <link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative'];?>/datatables.net-jqui/css/dataTables.jqueryui.css" type="text/css">
-    <link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative'];?>/bootstrap/dist/css/bootstrap.min.css" type="text/css">
+    <?php Header::setupHeader(['datatables', 'datatables-jqui-theme', 'jquery-ui']); ?>
 
-    <script src="<?php echo $GLOBALS['assets_static_relative'];?>/jquery-1-9-1/jquery.min.js"></script>
-    <script src="<?php echo $GLOBALS['assets_static_relative'];?>/jquery-ui/jquery-ui.min.js"></script>
-    <script src="<?php echo $GLOBALS['assets_static_relative'];?>/datatables.net/js/jquery.dataTables.js"></script>
-    <script src="<?php echo $GLOBALS['assets_static_relative'];?>/bootstrap/dist/js/bootstrap.min.js?v=40"></script>
-    <script src="<?php echo $GLOBALS['web_root'];?>/library/dialog.js"></script>
 </head>
 
 <body class="body_top">
 <?php if ($form_id) { ?>
-<form id="group_attendance_form" method=post onclick="top.restoreSession();" action="<?php echo $rootdir;?>/forms/group_attendance/save.php?mode=update&id=<?php echo attr($form_id) ;?>" name="my_form">
+<form id="group_attendance_form" method=post onclick="top.restoreSession();" action="<?php echo $rootdir;?>/forms/group_attendance/save.php?mode=update&id=<?php echo attr_url($form_id) ;?>" name="my_form">
 <?php } else { ?>
 <form id="group_attendance_form" method=post onclick="top.restoreSession();" action="<?php echo $rootdir;?>/forms/group_attendance/save.php?mode=new" name="my_form">
 <?php } ?>
@@ -91,8 +74,8 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
         <div class="button_wrap">
             <span class='title'><?php echo xlt('Group Attendance Form'); ?></span>
             <input class="button-css add_button" type="button" value="<?php echo xla('Add'); ?>" <?php if (!$can_edit) {
-?> disabled <?php
-} ?> >
+                ?> disabled <?php
+                                                                      } ?> >
         </div>
         <div id="add_participant_element"  style="display: none;">
             <div class="patient_wrap">
@@ -129,19 +112,19 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
                 <td ><?php echo text($participant['pid']); ?></td>
                 <td >
                     <select class="status_select" name="<?php echo "patientData[" . attr($participant['pid']) . "][status]" ;?>" <?php if (!$can_edit) {
-?> disabled <?php
-} ?> >
+                        ?> disabled <?php
+                                                        } ?> >
                         <?php foreach ($statuses_in_meeting as $status_in_meeting) {?>
                             <option value="<?php echo attr($status_in_meeting['option_id']); ?>" <?php if ($participant['meeting_patient_status'] == $status_in_meeting['option_id']) {
                                 echo 'selected';
-}?> > <?php echo xlt($status_in_meeting['title']); ?></option>
+                                           }?> > <?php echo xlt($status_in_meeting['title']); ?></option>
                         <?php } ?>
                     </select>
                 </td>
                 <td >
                     <input class="comment" type="text" name="<?php echo "patientData[" . attr($participant['pid']) . "][comment]";  ?>" value="<?php echo attr($participant['meeting_patient_comment']) ;?>" <?php if (!$can_edit) {
-?> disabled <?php
-} ?> ></input>
+                        ?> disabled <?php
+                                                             } ?> ></input>
                 </td>
             </tr>
         <?php } ?>
@@ -149,13 +132,13 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
     </table>
     <div class="action_buttons">
         <input name="submit" class="button-css" type="submit" value="<?php echo xla('Save'); ?>" <?php if (!$can_edit) {
-?> disabled <?php
-} ?> >
+            ?> disabled <?php
+                                                                     } ?> >
         <input class="button-css cancel" type="button" value="<?php echo xla('Cancel'); ?>">
     </div>
 </form>
 <script>
-    $(document).ready(function () {
+    $(function () {
 
         /* Initialise Datatable */
         var table = $('#group_attendance_form_table').DataTable({
@@ -167,7 +150,7 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
         });
 
         /* 'Add Participant' elements */
-        $('.add_button').click(function () {
+        $('.add_button').on('click', function () {
             $('#add_participant_element').show();
             $(this).hide();
         });
@@ -180,7 +163,7 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
             dlgopen(url, '_blank', 500, 400);
         });
 
-        $('.cancel_button').click(function () {
+        $('.cancel_button').on('click', function () {
             $('#add_participant_element').hide();
             $('.add_button').show();
 
@@ -189,13 +172,13 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
             $('.new_comment').val('');
         });
 
-        $('.add_patient_button').click(function(e){
+        $('.add_patient_button').on('click', function(e){
             var name = $('.new_patient').val();
 
             if(name == ""){
                 //If no patient was chosen (validation)
                 $('.new_patient').css("border-color", "red");
-                var err_msg = "<?php echo xlt("Choose Patient"); ?>";
+                var err_msg = <?php echo xlj("Choose Patient"); ?>;
                 $('.error_wrap .error').html(err_msg);
             }
             else{
@@ -213,7 +196,7 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
                 var exists = $.inArray(new_patient_id, ids_array);
                 if(exists >= 0){
                     $('.new_patient').css("border-color", "red");
-                    var err_msg = "<?php echo xlt("Patient already in form"); ?>";
+                    var err_msg = <?php echo xlj("Patient already in form"); ?>;
                     $('.error_wrap .error').html(err_msg);
                     return;
                 }
@@ -258,7 +241,7 @@ if ($form_id) {//If editing a form or the form already exists (inwhich case will
 
 
         /* Form elements */
-        $('.cancel').click(function () {
+        $('.cancel').on('click', function () {
             top.restoreSession();
             parent.closeTab(window.name, false);
         });

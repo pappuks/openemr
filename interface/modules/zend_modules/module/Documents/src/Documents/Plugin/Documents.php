@@ -1,26 +1,17 @@
 <?php
-/* +-----------------------------------------------------------------------------+
-*    OpenEMR - Open Source Electronic Medical Record
-*    Copyright (C) 2013 Z&H Consultancy Services Private Limited <sam@zhservices.com>
-*
-*    This program is free software: you can redistribute it and/or modify
-*    it under the terms of the GNU Affero General Public License as
-*    published by the Free Software Foundation, either version 3 of the
-*    License, or (at your option) any later version.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*    @author  Basil PT <basil@zhservices.com>
-* +------------------------------------------------------------------------------+
-*/
+/**
+ * interface/modules/zend_modules/module/Documents/src/Documents/Plugin/Documents.php
+ *
+ * @package   OpenEMR
+ * @link      https://www.open-emr.org
+ * @author    Basil PT <basil@zhservices.com>
+ * @copyright Copyright (c) 2013 Z&H Consultancy Services Private Limited <sam@zhservices.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 namespace Documents\Plugin;
 
-use Zend\Mvc\Controller\Plugin\AbstractPlugin;
+use OpenEMR\Common\Crypto\CryptoGen;
+use Laminas\Mvc\Controller\Plugin\AbstractPlugin;
 use Documents\Model\DocumentsTable;
 use Application\Model\ApplicationTable;
 use Application\Listener\Listener;
@@ -38,33 +29,8 @@ class Documents extends AbstractPlugin
    **/
     public function __construct($sm)
     {
-        $sm->get('Zend\Db\Adapter\Adapter');
+        $sm->get('Laminas\Db\Adapter\Adapter');
         $this->documentsTable = new DocumentsTable();
-    }
-
-    /**
-     * encrypt - Encrypts a plain text
-     * Supports AES-256-CBC encryption
-     * @param String $plain_text Plain Text to be encrypted
-     * @param String $key Encryption Key
-     * @return String
-     */
-    public function encrypt($plaintext, $key)
-    {
-                $obj = new \C_Document();
-                $obj->encrypt($plaintext, $key);
-    }
-
-    /**
-     * decrypt  - Decrypts an Encrypted String
-     * @param String $crypttext Encrypted String
-     * @param String $key Decryption Key
-     * @return String
-     */
-    public function decrypt($crypttext, $key)
-    {
-                $obj = new \C_Document();
-                $obj->decrypt($crypttext, $key);
     }
 
     /**
@@ -77,7 +43,8 @@ class Documents extends AbstractPlugin
         $host       = $GLOBALS['couchdb_host'];
         $port       = $GLOBALS['couchdb_port'];
         $usename    = $GLOBALS['couchdb_user'];
-        $password   = $GLOBALS['couchdb_pass'];
+        $cryptoGen  = new CryptoGen();
+        $password   = $cryptoGen->decryptStandard($GLOBALS['couchdb_pass']);
         $database   = $GLOBALS['couchdb_dbase'];
         $enable_log = ($GLOBALS['couchdb_log'] == 1) ? true : false;
 
@@ -137,7 +104,7 @@ class Documents extends AbstractPlugin
         $count  = 0;
         $module = array();
         foreach ($result as $row) {
-            $content = \Documents\Plugin\Documents::getDocument($row['id']);
+            $content = $this->getDocument($row['id']);
             $module[$count]['doc_id']   = $row['id'];
             if (preg_match("/<ClinicalDocument/", $content)) {
                 if (preg_match("/2.16.840.1.113883.3.88.11.32.1/", $content)) {

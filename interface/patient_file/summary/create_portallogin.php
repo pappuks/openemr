@@ -1,62 +1,49 @@
 <?php
-// +-----------------------------------------------------------------------------+
-// Copyright (C) 2011 Z&H Consultancy Services Private Limited <sam@zhservices.com>
-//
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-//
-// A copy of the GNU General Public License is included along with this program:
-// openemr/interface/login/GnuGPL.html
-// For more information write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-//
-// Author:   Eldho Chacko <eldho@zhservices.com>
-//           Jacob T Paul <jacob@zhservices.com>
-//           Paul Simon   <paul@zhservices.com>
-//
-// +------------------------------------------------------------------------------+
+/**
+ * create_portallogin.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Eldho Chacko <eldho@zhservices.com>
+ * @author    Jacob T Paul <jacob@zhservices.com>
+ * @author    Paul Simon <paul@zhservices.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @author    Tyler Wrenn <tyler@tylerwrenn.com>
+ * @copyright Copyright (c) 2011 Z&H Consultancy Services Private Limited <sam@zhservices.com>
+ * @copyright Copyright (c) 2018-2019 Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2020 Tyler Wrenn <tyler@tylerwrenn.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
 
 
- require_once("../../globals.php");
+require_once("../../globals.php");
+
+use OpenEMR\Common\Auth\AuthHash;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Utils\RandomGenUtils;
+use OpenEMR\Core\Header;
 
 // Collect portalsite parameter (either off for offsite or on for onsite); only allow off or on
 $portalsite = isset($_GET['portalsite']) ? $_GET['portalsite'] : $portalsite = "off";
 if ($portalsite != "off" && $portalsite != "on") {
     $portalsite = "off";
 }
+$trustedEmail = sqlQueryNoLog("SELECT email_direct, email FROM `patient_data` WHERE `pid`=?", array($pid));
+$row = sqlQuery("SELECT pd.*,pao.portal_username, pao.portal_login_username,pao.portal_pwd,pao.portal_pwd_status FROM patient_data AS pd LEFT OUTER JOIN patient_access_" . escape_identifier($portalsite, array("on","off"), true) . "site AS pao ON pd.pid=pao.pid WHERE pd.pid=?", array($pid));
 
- $row = sqlQuery("SELECT pd.*,pao.portal_username,pao.portal_pwd,pao.portal_pwd_status FROM patient_data AS pd LEFT OUTER JOIN patient_access_" . add_escape_custom($portalsite) . "site AS pao ON pd.pid=pao.pid WHERE pd.pid=?", array($pid));
-
-function generatePassword($length = 6, $strength = 1)
-{
-    $consonants = 'bdghjmnpqrstvzacefiklowxy';
-    $numbers = '0234561789';
-    $specials = '@#$%';
-
-
-    $password = '';
-    $alt = time() % 2;
-    for ($i = 0; $i < $length/3; $i++) {
-        if ($alt == 1) {
-            $password .= $consonants[(rand() % strlen($consonants))].$numbers[(rand() % strlen($numbers))].$specials[(rand() % strlen($specials))];
-            $alt = 0;
-        } else {
-            $password .= $numbers[(rand() % strlen($numbers))].$specials[(rand() % strlen($specials))].$consonants[(rand() % strlen($consonants))];
-            $alt = 1;
-        }
+$trustedEmail['email_direct'] = !empty(trim($trustedEmail['email_direct'])) ? text(trim($trustedEmail['email_direct'])) : text(trim($trustedEmail['email']));
+$trustedUserName = $trustedEmail['email_direct'];
+// check for duplicate username
+$dup_check = sqlQueryNoLog("SELECT * FROM patient_access_" . escape_identifier($portalsite, array("on","off"), true) .
+    "site WHERE pid != ? AND portal_login_username = ?", array($pid, $trustedUserName));
+// make unique if needed
+if (!empty($dup_check)) {
+    if (strpos($trustedUserName, '@')) {
+        $trustedUserName = str_replace("@", "$pid@", $trustedUserName);
+    } else {
+        // account name will be used and is unique
+        $trustedUserName = '';
     }
-
-    return $password;
 }
 
 function validEmail($email)
@@ -68,34 +55,35 @@ function validEmail($email)
     return false;
 }
 
-function messageCreate($uname, $pass, $site)
+function messageCreate($uname, $luname, $pass, $site)
 {
-    $message = htmlspecialchars(xl("Patient Portal Web Address"), ENT_NOQUOTES) . ":<br>";
+    global $trustedEmail;
+
+    $message = xlt("Patient Portal Web Address") . ":<br />";
     if ($site == "on") {
-        if ($GLOBALS['portal_onsite_enable']) {
-            $message .= "<a href='" . htmlspecialchars($GLOBALS['portal_onsite_address'], ENT_QUOTES) . "'>" .
-                    htmlspecialchars($GLOBALS['portal_onsite_address'], ENT_NOQUOTES) . "</a><br>";
-        }
-
         if ($GLOBALS['portal_onsite_two_enable']) {
-            $message .= "<a href='" . htmlspecialchars($GLOBALS['portal_onsite_two_address'], ENT_QUOTES) . "'>" .
-                    htmlspecialchars($GLOBALS['portal_onsite_two_address'], ENT_NOQUOTES) . "</a><br>";
+            $message .= "<a href='" . attr($GLOBALS['portal_onsite_two_address']) . "' target='_blank'>" .
+                text($GLOBALS['portal_onsite_two_address']) . "</a><br />";
         }
 
-        $message .= "<br>";
-    } // $site == "off"
-    else {
-        $offsite_portal_patient_link = $GLOBALS['portal_offsite_address_patient_link'] ?  htmlspecialchars($GLOBALS['portal_offsite_address_patient_link'], ENT_QUOTES) : htmlspecialchars("https://mydocsportal.com", ENT_QUOTES);
-        $message .= "<a href='" . $offsite_portal_patient_link . "'>" .
-                    $offsite_portal_patient_link . "</a><br><br>";
-        $message .= htmlspecialchars(xl("Provider Id"), ENT_NOQUOTES) . ": " .
-            htmlspecialchars($GLOBALS['portal_offsite_providerid'], ENT_NOQUOTES) . "<br><br>";
+        $message .= "<br />";
+    } else { // $site == "off"
+        $offsite_portal_patient_link = $GLOBALS['portal_offsite_address_patient_link'] ? $GLOBALS['portal_offsite_address_patient_link'] : "https://mydocsportal.com";
+        $message .= "<a href='" . attr($offsite_portal_patient_link) . "'>" .
+            text($offsite_portal_patient_link) . "</a><br /><br />";
+        $message .= xlt("Provider Id") . ": " .
+            text($GLOBALS['portal_offsite_providerid']) . "<br /><br />";
     }
-
-        $message .= htmlspecialchars(xl("User Name"), ENT_NOQUOTES) . ": " .
-                    htmlspecialchars($uname, ENT_NOQUOTES) . "<br><br>" .
-                    htmlspecialchars(xl("Password"), ENT_NOQUOTES) . ": " .
-                    htmlspecialchars($pass, ENT_NOQUOTES) . "<br><br>";
+    $sub = '';
+    if ($GLOBALS['enforce_signin_email']) {
+        $sub = xlt("Login Trusted Email") . ":" .
+            (!empty(trim($trustedEmail['email_direct'])) ? text(trim($trustedEmail['email_direct'])) : xlt("Is Required. Contact Provider."));
+        $sub .= "<br /><br />";
+    }
+    $message .= xlt("Portal Account Name") . ": " . text($uname) . "<br /><br /><strong>" .
+        xlt("Login User Name") . ":</strong> " . text($luname) . "<br /><strong>" .
+        xlt("Password") . ":</strong> " .
+        text($pass) . "<br /><br />" . $sub;
     return $message;
 }
 
@@ -113,6 +101,10 @@ function emailLogin($patient_id, $message)
     if (!(validEmail($GLOBALS['patient_reminder_sender_email']))) {
         return false;
     }
+    $message .= "<strong>" . xlt("You may be required to change your password during first login.") . "</strong><br />";
+    $message .= xlt("This is required for your security as well as ours.") . "<br />";
+    $message .= xlt("Afterwards however, you may change your portal credentials anytime from portal menu.") . ":<br /><br />";
+    $message .= xlt("Thank you for allowing us to serve you.") . ":<br />";
 
     $mail = new MyMailer();
     $pt_name=$patientData['fname'].' '.$patientData['lname'];
@@ -131,7 +123,7 @@ function emailLogin($patient_id, $message)
         return true;
     } else {
         $email_status = $mail->ErrorInfo;
-        error_log("EMAIL ERROR: ".$email_status, 0);
+        error_log("EMAIL ERROR: " . errorLogEscape($email_status), 0);
         return false;
     }
 }
@@ -140,28 +132,33 @@ function displayLogin($patient_id, $message, $emailFlag)
 {
     $patientData = sqlQuery("SELECT * FROM `patient_data` WHERE `pid`=?", array($patient_id));
     if ($emailFlag) {
-        $message = "<br><br>" .
-                   htmlspecialchars(xl("Email was sent to following address"), ENT_NOQUOTES) . ": " .
-                   htmlspecialchars($patientData['email'], ENT_NOQUOTES) . "<br><br>" .
-                   $message;
+        $message = "<br /><br />" .
+            xlt("Email was sent to following address") . ": " .
+            text($patientData['email']) . "<br /><br />" .
+            $message;
     }
-
-    echo "<html><body onload='top.printLogPrint(window);'>" . $message . "</body></html>";
+    
+    return $message;
 }
 
-if (isset($_REQUEST['form_save']) && $_REQUEST['form_save']=='SUBMIT') {
-    require_once("$srcdir/authentication/common_operations.php");
+if (isset($_POST['form_save']) && $_POST['form_save']=='submit') {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
 
-    $clear_pass=$_REQUEST['pwd'];
+    $clear_pass=$_POST['pwd'];
 
-    $res = sqlStatement("SELECT * FROM patient_access_" . add_escape_custom($portalsite) . "site WHERE pid=?", array($pid));
-    $query_parameters=array($_REQUEST['uname']);
-    $salt_clause="";
+    $res = sqlStatement("SELECT * FROM patient_access_" . escape_identifier($portalsite, array("on","off"), true) . "site WHERE pid=?", array($pid));
+    $query_parameters=array($_POST['uname'],$_POST['login_uname']);
     if ($portalsite=='on') {
-        // For onsite portal create a blowfish based hash and salt.
-        $new_salt = oemr_password_salt();
-        $salt_clause = ",portal_salt=? ";
-        array_push($query_parameters, oemr_password_hash($clear_pass, $new_salt), $new_salt);
+        // For onsite portal create a modern hash
+        $hash = (new AuthHash('auth'))->passwordHash($clear_pass);
+        if (empty($hash)) {
+            // Something is seriously wrong
+            error_log('OpenEMR Error : OpenEMR is not working because unable to create a hash.');
+            die("OpenEMR Error : OpenEMR is not working because unable to create a hash.");
+        }
+        array_push($query_parameters, $hash);
     } else {
         // For offsite portal still create and SHA1 hashed password
         // When offsite portal is updated to handle blowfish, then both portals can use the same execution path.
@@ -170,81 +167,102 @@ if (isset($_REQUEST['form_save']) && $_REQUEST['form_save']=='SUBMIT') {
 
     array_push($query_parameters, $pid);
     if (sqlNumRows($res)) {
-        sqlStatement("UPDATE patient_access_" . add_escape_custom($portalsite) . "site SET portal_username=?,portal_pwd=?,portal_pwd_status=0 " . $salt_clause . " WHERE pid=?", $query_parameters);
+        sqlStatementNoLog("UPDATE patient_access_" . escape_identifier($portalsite, array("on","off"), true) . "site SET portal_username=?,portal_login_username=?,portal_pwd=?,portal_pwd_status=0 WHERE pid=?", $query_parameters);
     } else {
-        sqlStatement("INSERT INTO patient_access_" . add_escape_custom($portalsite) . "site SET portal_username=?,portal_pwd=?,portal_pwd_status=0" . $salt_clause . " ,pid=?", $query_parameters);
+        sqlStatementNoLog("INSERT INTO patient_access_" . escape_identifier($portalsite, array("on","off"), true) . "site SET portal_username=?,portal_login_username=?,portal_pwd=?,portal_pwd_status=0,pid=?", $query_parameters);
     }
 
     // Create the message
-    $message = messageCreate($_REQUEST['uname'], $clear_pass, $portalsite);
+    $message = messageCreate($_POST['uname'], $_POST['login_uname'], $clear_pass, $portalsite);
     // Email and display/print the message
     if (emailLogin($pid, $message)) {
         // email was sent
-        displayLogin($pid, $message, true);
+        $credMessage = displayLogin($pid, $message, true);
     } else {
         // email wasn't sent
-        displayLogin($pid, $message, false);
+        $credMessage = displayLogin($pid, $message, false);
     }
-
-    exit;
 } ?>
-
 <html>
 <head>
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
 
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-1-7-2/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $webroot ?>/interface/main/tabs/js/include_opener.js"></script>
+<?php Header::setupHeader('opener'); ?>
+<style>
+    @media print {
+        body {
+            font-size: 24pt !important;
+        }
+        .alert {
+            border: 0 !important;
+        }
+        .alert-success {
+            color: #000 !important;
+            background-color: #fff !important;
+        }
+    }
+</style>
 <script type="text/javascript">
 function transmit(){
-
-                // get a public key to encrypt the password info and send
-                document.getElementById('form_save').value='SUBMIT';
-                document.forms[0].submit();
+    // get a public key to encrypt the password info and send
+    document.getElementById('form_save').value='submit';
+    document.forms[0].submit();
 }
+<?php if (!empty($credMessage)) { ?>
+    $(function(){
+        top.printLogPrint(window);
+    });
+<?php } ?>
 </script>
 </head>
 <body class="body_top">
-    <form name="portallogin" action="" method="POST">
-    <table align="center" style="margin-top:10px">
-        <tr class="text">
-            <th colspan="5" align="center"><?php echo htmlspecialchars(xl("Generate Username And Password For")." ".$row['fname'], ENT_QUOTES);?></th>
-        </tr>
-    <?php
-    if ($portalsite == 'off') {
-    ?>
-    <tr class="text">
-    <td><?php echo htmlspecialchars(xl('Provider Id').':', ENT_QUOTES);?></td>
-    <td><span><?php echo htmlspecialchars($GLOBALS['portal_offsite_providerid'], ENT_QUOTES);?></span></td>
-    </tr>
-    <?php
-    }
-    ?>
-        <tr class="text">
-            <td><?php echo htmlspecialchars(xl('User Name').':', ENT_QUOTES);?></td>
-            <td><input type="text" name="uname" value="<?php if ($row['portal_username']) {
-                echo htmlspecialchars($row['portal_username'], ENT_QUOTES);
-} else {
-    echo htmlspecialchars($row['fname'].$row['id'], ENT_QUOTES);
-}?>" size="10" readonly></td>
-        </tr>
-        <tr class="text">
-            <td><?php echo htmlspecialchars(xl('Password').':', ENT_QUOTES);?></td>
-            <?php
-            $pwd = generatePassword();
-            ?>
-            <td><input type="text" name="pwd" id="pwd" value="<?php echo htmlspecialchars($pwd, ENT_QUOTES);?>" size="10"/>
-            </td>
-            <td><a href="#" class="css_button" onclick="top.restoreSession(); javascript:document.location.reload()"><span><?php echo htmlspecialchars(xl('Change'), ENT_QUOTES);?></span></a></td>
-        </tr>
-        <tr class="text">
-            <td><input type="hidden" name="form_save" id="form_save"></td>
-            <td colspan="5" align="center">
-                <a href="#" class="css_button" onclick="return transmit()"><span><?php echo htmlspecialchars(xl('Save'), ENT_QUOTES);?></span></a>
-                <input type="hidden" name="form_cancel" id="form_cancel">
-                <a href="#" class="css_button" onclick="top.restoreSession(); dlgclose();"><span><?php echo htmlspecialchars(xl('Cancel'), ENT_QUOTES);?></span></a>
-            </td>
-        </tr>
-    </table>
-    </form>
+    <div class="container-fluid">
+        
+        <?php if (!empty($credMessage)) { ?>
+        <div class="alert alert-success" role="alert">
+            <p class="font-weight-bold"><?php echo xlt("Portal Credential Information"); ?></p>
+            <?php echo $credMessage; ?>
+        </div>
+        <?php } else { ?>
+        <form name="portallogin" action="" method="post">
+            <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
+
+            <p class="text-center font-weight-bold"><?php echo text(xl("Generate Username And Password For")." ".$row['fname']);?></p>
+
+            <div class="row">
+                <?php if ($portalsite == 'off') { ?>
+                <div class="col"><?php echo text(xl('Provider Id').':');?></div>
+                <div class="col"><?php echo text($GLOBALS['portal_offsite_providerid']);?></div>
+                <?php } ?>
+            </div>
+            <div class="form-group">
+                <label class="font-weight-bold" for="uname"><?php echo text(xl('Account Name').':');?></label>
+                <input type="text" class="form-control" name="uname" id="uname" value="<?php echo ($row['portal_username']) ? attr($row['portal_username']) : attr($row['fname'].$row['id']); ?>" size="10" readonly />
+            </div>
+            <div class="form-group">
+                <label class="font-weight-bold" for="login_uname"><?php echo text(xl('Login User Name').':');?></label>
+                <input type="text" class="form-control" name="login_uname" id="login_uname" value="<?php echo (!empty($trustedUserName) ? text($trustedUserName) : attr($row['portal_username'])); ?>" readonly />
+            </div>
+            <label class="font-weight-bold" for="pwd"><?php echo text(xl('Password').':');?></label>
+            <div class="input-group">
+                <?php $pwd = RandomGenUtils::generatePortalPassword(); ?>
+                <input type="text" class="form-control" name="pwd" id="pwd" value="<?php echo attr($pwd); ?>" size="14" />
+                <div class="input-group-append">
+                    <a href="#" class="btn btn-primary" onclick="top.restoreSession(); javascript:document.location.reload()"><?php echo xlt('Change'); ?></a>
+                </div>
+            </div>
+            <?php if ($GLOBALS['enforce_signin_email']) { ?>
+            <div class="form-group">
+                <label class="font-weight-bold" for="email_direct"><?php echo xlt("Login Trusted Email") . ":" ?></label>
+                <?php echo (!empty(trim($trustedEmail['email_direct'])) ? text($trustedEmail['email_direct']) : xlt("Is Required. Please Add in Contacts.")) ?>
+            </div>
+            <?php } ?>
+            <hr />
+            <input type="hidden" name="form_save" id="form_save" />
+            <a href="#" class="btn btn-primary" onclick="return transmit()"><?php echo xlt('Save');?></a>
+            <input type="hidden" name="form_cancel" id="form_cancel" />
+            <a href="#" class="btn btn-secondary" onclick="top.restoreSession(); dlgclose();"><?php echo xlt('Cancel');?></a>
+        </form>
+        <?php } ?>
+    </div>
 </body>
+</html>

@@ -11,6 +11,7 @@
 
 require_once("../../globals.php");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 use OpenEMR\Services\ONoteService;
 
@@ -24,8 +25,8 @@ $active = (isset($_REQUEST['active'])) ? $_REQUEST['active'] : -1;
 
 //this code handles changing the state of activity tags when the user updates them through the interface
 if (isset($_POST['mode'])) {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     if ($_POST['mode'] == "update") {
@@ -54,7 +55,7 @@ if (isset($_POST['mode'])) {
 <div id="officenotes_edit">
 
 <form method="post" name="new_note" action="office_comments_full.php" onsubmit='return top.restoreSession()'>
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <?php
 /* BACK should go to the main Office Notes screen */
@@ -70,7 +71,7 @@ if ($userauthorized) {
 <span class="title"><?php echo xlt('Office Notes'); ?></span>
 <span class="back"><?php echo text($tback); ?></span></a>
 
-<br>
+<br />
 <input type="hidden" name="mode" value="new">
 <input type="hidden" name="offset" value="<?php echo attr($offset); ?>">
 <input type="hidden" name="active" value="<?php echo attr($active); ?>">
@@ -83,7 +84,7 @@ if ($userauthorized) {
 <hr>
 
 <form method="post" name="update_activity" action="office_comments_full.php" onsubmit='return top.restoreSession()'>
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
 
 <?php //change the view on the current mode, whether all, active, or inactive
 if ($active==="1") {
@@ -98,9 +99,9 @@ if ($active==="1") {
 }
 ?>
 
-<a href="office_comments_full.php?offset=0&active=-1" class="css_button<?php echo attr($all_class);?>" onclick='top.restoreSession()'><?php echo xlt('All'); ?></a>
-<a href="office_comments_full.php?offset=0&active=1" class="css_button<?php echo attr($active_class);?>" onclick='top.restoreSession()'><?php echo xlt('Only Active'); ?></a>
-<a href="office_comments_full.php?offset=0&active=0" class="css_button<?php echo attr($inactive_class);?>" onclick='top.restoreSession()'><?php echo xlt('Only Inactive'); ?></a>
+<a href="office_comments_full.php?offset=0&active=-1" class="btn btn-primary<?php echo attr($all_class);?>" onclick='top.restoreSession()'><?php echo xlt('All'); ?></a>
+<a href="office_comments_full.php?offset=0&active=1" class="btn btn-primary<?php echo attr($active_class);?>" onclick='top.restoreSession()'><?php echo xlt('Only Active'); ?></a>
+<a href="office_comments_full.php?offset=0&active=0" class="btn btn-primary<?php echo attr($inactive_class);?>" onclick='top.restoreSession()'><?php echo xlt('Only Inactive'); ?></a>
 
 <input type="hidden" name="mode" value="update">
 <input type="hidden" name="offset" value="<?php echo attr($offset);?>">
@@ -156,13 +157,13 @@ if ($notes) {
 <tr><td>
 <?php
 if ($offset>($N-1)) {
-    echo "<a class='css_button' href=office_comments_full.php?active=".attr(urlencode($active))."&offset=".attr(urlencode($offset-$N))." onclick='top.restoreSession()'>".xlt('Previous')."</a>";
+    echo "<a class='btn btn-secondary' href=office_comments_full.php?active=".attr_url($active)."&offset=".attr_url($offset-$N)." onclick='top.restoreSession()'>".xlt('Previous')."</a>";
 }
 ?>
-</td><td align=right>
+</td><td align='right'>
 <?php
 if ($result_count == $N) {
-    echo "<a class='css_button' href=office_comments_full.php?active=".attr(urlencode($active))."&offset=".attr(urlencode($offset+$N))." onclick='top.restoreSession()'>".xlt('Next')."</a>";
+    echo "<a class='btn btn-secondary' href=office_comments_full.php?active=".attr_url($active)."&offset=".attr_url($offset+$N)." onclick='top.restoreSession()'>".xlt('Next')."</a>";
 }
 ?>
 </td></tr>

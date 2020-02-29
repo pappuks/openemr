@@ -1,28 +1,32 @@
 <?php
 /**
- * Copyright (C) 2005-2017 Rod Roark <rod@sunsetsystems.com>
+ * stats_full.php
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2005-2017 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
-
 
 
 require_once('../../globals.php');
 require_once($GLOBALS['srcdir'].'/lists.inc');
-require_once($GLOBALS['srcdir'].'/acl.inc');
 require_once($GLOBALS['fileroot'].'/custom/code_types.inc.php');
 require_once($GLOBALS['srcdir'].'/options.inc.php');
 
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 use OpenEMR\Menu\PatientMenuRole;
+use OpenEMR\OeUI\OemrUI;
 
 // Check if user has permission for any issue type.
 $auth = false;
 foreach ($ISSUE_TYPES as $type => $dummy) {
-    if (acl_check_issue($type)) {
+    if (AclMain::aclCheckIssue($type)) {
         $auth = true;
         break;
     }
@@ -30,7 +34,7 @@ foreach ($ISSUE_TYPES as $type => $dummy) {
 
 if ($auth) {
     $tmp = getPatientData($pid, "squad");
-    if ($tmp['squad'] && ! acl_check('squads', $tmp['squad'])) {
+    if ($tmp['squad'] && ! AclMain::aclCheckCore('squads', $tmp['squad'])) {
         die(xlt('Not authorized'));
     }
 } else {
@@ -63,14 +67,14 @@ function refreshIssue(issue, title) {
 function dopclick(id,category) {
     top.restoreSession();
     if (category == 0) category = '';
-    dlgopen('add_edit_issue.php?issue=' + encodeURIComponent(id) + '&thistype=' + encodeURIComponent(category), '_blank', 650, 500, '', '<?php echo xla("Add/Edit Issue"); ?>');
+    dlgopen('add_edit_issue.php?issue=' + encodeURIComponent(id) + '&thistype=' + encodeURIComponent(category), '_blank', 650, 500, '', <?php echo xlj("Add/Edit Issue"); ?>);
     //dlgopen('add_edit_issue.php?issue=' + encodeURIComponent(id) + '&thistype=' + encodeURIComponent(category), '_blank', 650, 600);
 }
 
 // Process click on number of encounters.
 function doeclick(id) {
     top.restoreSession();
-    dlgopen('../problem_encounter.php?issue=' + id, '_blank', 700, 400);
+    dlgopen('../problem_encounter.php?issue=' + encodeURIComponent(id), '_blank', 700, 400);
 }
 
 // Process click on diagnosis for patient education popup.
@@ -78,7 +82,7 @@ function educlick(codetype, codevalue) {
   top.restoreSession();
   dlgopen('../education.php?type=' + encodeURIComponent(codetype) +
     '&code=' + encodeURIComponent(codevalue) +
-    '&language=<?php echo urlencode($language); ?>',
+    '&language=' + <?php echo js_url($language); ?>,
     '_blank', 1024, 750,true); // Force a new window instead of iframe to address cross site scripting potential
 }
 
@@ -89,56 +93,52 @@ function newEncounter() {
  location.href='../../forms/newpatient/new.php?autoloaded=1&calenc=';
 }
 </script>
-<?php
-//to determine and set the form to open in the desired state - expanded or centered, any selection the user makes will
-//become the user-specific default for that page. collectAndOrganizeExpandSetting() contains a single array as an
-//argument, containing one or more elements, the name of the current file is the first element, if there are linked
-// files they should be listed thereafter, please add _xpd suffix to the file name
-$arr_files_php = array("stats_full_patient_xpd", "external_data_patient_xpd", "patient_ledger_patient_xpd");
-$current_state = collectAndOrganizeExpandSetting($arr_files_php);
-require_once("$srcdir/expand_contract_inc.php");
-?>
 <script>
 <?php
 require_once("$include_root/patient_file/erx_patient_portal_js.php"); // jQuery for popups for eRx and patient portal
-require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/contract icon toggle if form is expandable
 ?>
 </script>
+<?php
+$arrOeUiSettings = array(
+    'heading_title' => xl('Medical Issues'),
+    'include_patient_name' => true,
+    'expandable' => true,
+    'expandable_files' => array("stats_full_patient_xpd", "external_data_patient_xpd", "patient_ledger_patient_xpd"),//all file names need suffix _xpd
+    'action' => "",//conceal, reveal, search, reset, link or back
+    'action_title' => "",
+    'action_href' => "",//only for actions - reset, link or back
+    'show_help_icon' => true,
+    'help_file_name' => "issues_dashboard_help.php"
+);
+$oemr_ui = new OemrUI($arrOeUiSettings);
+?>
 </head>
 
-<body class="body_top">
-    <div class="<?php echo $container;?> expandable">
-        <?php $header_title = xl('Medical Issues for');?>
+<body class="body_top patient-medical-issues">
+    <div id="container_div" class="<?php echo $oemr_ui->oeContainer();?>">
         <div class="row">
             <div class="col-sm-12">
-                <?php
-                $expandable = 1;
-                require_once("$include_root/patient_file/summary/dashboard_header.php")
-                ?>
+                <?php require_once("$include_root/patient_file/summary/dashboard_header.php") ?>
             </div>
         </div>
-        <div class="row" >
-            <div class="col-sm-12">
-                <?php
-                $list_id = "nav-list6"; // to indicate nav item is active, count and give correct id
-                // Collect the patient menu then build it
-                $menuPatient = new PatientMenuRole();
-                $menuPatient->displayHorizNavBarMenu();
-                ?>
-            </div>
-        </div>
+        <?php
+        $list_id = "issues"; // to indicate nav item is active, count and give correct id
+        // Collect the patient menu then build it
+        $menuPatient = new PatientMenuRole();
+        $menuPatient->displayHorizNavBarMenu();
+        ?>
 
         <div id='patient_stats'>
             <form method='post' action='stats_full.php' onsubmit='return top.restoreSession()'>
 
-            <table>
+            <table class="table">
 
             <?php
             $encount = 0;
             $lasttype = "";
             $first = 1; // flag for first section
             foreach ($ISSUE_TYPES as $focustype => $focustitles) {
-                if (!acl_check_issue($focustype)) {
+                if (!AclMain::aclCheckIssue($focustype)) {
                     continue;
                 }
 
@@ -155,37 +155,38 @@ require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/
                     echo "</table>";
                 }
 
-              // Show header
+                // Show header
                 $disptype = $focustitles[0];
-                if (acl_check_issue($focustype, '', array('write', 'addonly'))) {
+                if (AclMain::aclCheckIssue($focustype, '', array('write', 'addonly'))) {
                     if (($focustype=='allergy' || $focustype=='medication') && $GLOBALS['erx_enable']) {
-                        echo "<a href='../../eRx.php?page=medentry' class='css_button_small' onclick='top.restoreSession()' ><span>" .
-                        xlt('Add') . "</span></a>\n";
+                        echo "<a href='../../eRx.php?page=medentry' class='btn btn-primary btn-sm' onclick='top.restoreSession()' >" .
+                        xlt('Add') . "</a>\n";
                     } else {
-                        echo "<a href='javascript:;' class='css_button_small' onclick='dopclick(0,\"" .
-                        attr($focustype)  . "\")'><span>" . xlt('Add') . "</span></a>\n";
+                        echo "<a href='javascript:;' class='btn btn-primary btn-sm' onclick='dopclick(0," .
+                        attr_js($focustype)  . ")'>" . xlt('Add') . "</a>\n";
                     }
                 }
 
                 echo "  <span class='title'>" . text($disptype) . "</span>\n";
-              // echo " <table style='margin-bottom:1em;text-align:center'>";
-                echo " <table style='margin-bottom:1em;'>";
+                echo " <table class='table' style='margin-bottom: 1em;'>";
                 ?>
-              <tr class='head'>
-                <th style='text-align:left'><?php echo xlt('Title'); ?></th>
-                <th style='text-align:left'><?php echo xlt('Begin'); ?></th>
-                <th style='text-align:left'><?php echo xlt('End'); ?></th>
-                <th style='text-align:left'><?php echo xlt('Coding (click for education)'); ?></th>
-                <th style='text-align:left'><?php echo xlt('Status'); ?></th>
-                <th style='text-align:left'><?php echo xlt('Occurrence'); ?></th>
+            <thead>
+              <tr>
+                <th scope="col"><?php echo xlt('Title'); ?></th>
+                <th scope="col"><?php echo xlt('Begin'); ?></th>
+                <th scope="col"><?php echo xlt('End'); ?></th>
+                <th scope="col"><?php echo xlt('Coding (click for education)'); ?></th>
+                <th scope="col"><?php echo xlt('Status'); ?></th>
+                <th scope="col"><?php echo xlt('Occurrence'); ?></th>
                 <?php if ($focustype == "allergy") { ?>
-                  <th style='text-align:left'><?php echo xlt('Reaction'); ?></th>
+                  <th scope="col"><?php echo xlt('Reaction'); ?></th>
                 <?php } ?>
-                <th style='text-align:left'><?php echo xlt('Referred By'); ?></th>
-                <th style='text-align:left'><?php echo xlt('Modify Date'); ?></th>
-                <th style='text-align:left'><?php echo xlt('Comments'); ?></th>
-                <th><?php echo xlt('Enc'); ?></th>
+                <th scope="col"><?php echo xlt('Referred By'); ?></th>
+                <th scope="col"><?php echo xlt('Modify Date'); ?></th>
+                <th scope="col"><?php echo xlt('Comments'); ?></th>
+                <th scope="col"><?php echo xlt('Enc'); ?></th>
                 </tr>
+            </thead>
                 <?php
 
               // collect issues
@@ -201,16 +202,16 @@ require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/
                 if (sqlNumRows($pres) < 1) {
                     if (getListTouch($pid, $focustype)) {
                         // Data entry has happened to this type, so can display an explicit None.
-                        echo "<tr><td class='text'><b>" . xlt("None") . "</b></td></tr>";
+                        echo "<tr><td class='text font-weight-bold'>" . xlt("None{{Issue}}") . "</td></tr>";
                     } else {
                           // Data entry has not happened to this type, so can show the none selection option.
                           echo "<tr><td class='text'><input type='checkbox' class='noneCheck' name='" .
                         attr($focustype) . "' value='none'";
-                        if (!acl_check_issue($focustype, '', 'write')) {
+                        if (!AclMain::aclCheckIssue($focustype, '', 'write')) {
                             echo " disabled";
                         }
 
-                          echo " /><b>" . xlt("None") . "</b></td></tr>";
+                          echo " /><b>" . xlt("None{{Issue}}") . "</b></td></tr>";
                     }
                 }
 
@@ -227,7 +228,7 @@ require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/
                     ++$encount;
                     $bgclass = (($encount & 1) ? "bg1" : "bg2");
 
-                    $colorstyle = empty($row['enddate']) ? "style='color:red'" : "";
+                    $colorstyle = empty($row['enddate']) ? "style='color: var(--danger)'" : "";
 
                     // look up the diag codes
                     $codetext = "";
@@ -240,7 +241,7 @@ require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/
                                 $codetext .= "<br />";
                             }
 
-                            $codetext .= "<a href='javascript:educlick(\"$codetype\",\"$code\")' $colorstyle>" .
+                            $codetext .= "<a href='javascript:educlick(" . attr_js($codetype) . "," . attr_js($code) . ")' $colorstyle>" .
                               text($diag . " (" . $codedesc . ")") . "</a>";
                         }
                     }
@@ -262,10 +263,10 @@ require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/
                         $click_class='';
                     }
 
-                    echo " <tr class='$bgclass detail' $colorstyle>\n";
-                    echo "  <td style='text-align:left' class='$click_class' id='$rowid'>" . text($disptitle) . "</td>\n";
-                    echo "  <td>" . text($row['begdate']) . "&nbsp;</td>\n";
-                    echo "  <td>" . text($row['enddate']) . "&nbsp;</td>\n";
+                    echo " <tr class='" . attr($bgclass) . " detail' $colorstyle>\n";
+                    echo "  <td class='text-left " . attr($click_class) . "' id='" . attr($rowid) . "'>" . text($disptitle) . "</td>\n";
+                    echo "  <td>" . text(oeFormatShortDate($row['begdate'])) . "&nbsp;</td>\n";
+                    echo "  <td>" . text(oeFormatShortDate($row['enddate'])) . "&nbsp;</td>\n";
                     // both codetext and statusCompute have already been escaped above with htmlspecialchars)
                     echo "  <td>" . $codetext . "</td>\n";
                     echo "  <td>" . $statusCompute . "&nbsp;</td>\n";
@@ -279,9 +280,9 @@ require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/
                     }
 
                     echo "  <td>" . text($row['referredby']) . "</td>\n";
-                    echo "  <td>" . text($row['modifydate']) . "</td>\n";
+                    echo "  <td>" . text(oeFormatDateTime($row['modifydate'])) . "</td>\n";
                     echo "  <td>" . text($row['comments']) . "</td>\n";
-                    echo "  <td id='e_$rowid' class='noclick center' title='" . xla('View related encounters') . "'>";
+                    echo "  <td id='e_" . attr($rowid) . "' class='noclick text-center' title='" . xla('View related encounters') . "'>";
                     echo "  <input type='button' value='" . attr($ierow['count']) . "' class='editenc' id='" . attr($rowid) . "' />";
                     echo "  </td>";
                     echo " </tr>\n";
@@ -296,21 +297,14 @@ require_once("$include_root/expand_contract_js.php");//jQuery to provide expand/
             </form>
         </div> <!-- end patient_stats -->
     </div><!--end of container div -->
-    <?php
-    //home of the help modal ;)
-    //$GLOBALS['enable_help'] = 0; // Please comment out line if you want help modal to function on this page
-    if ($GLOBALS['enable_help'] == 1) {
-        echo "<script>var helpFile = 'issues_dashboard_help.php'</script>";
-        require "$include_root/help_modal.php";
-    }
-    ?>
-    
+    <?php $oemr_ui->oeBelowContainerDiv();?>
+
 </body>
 
-<script language="javascript">
+<script>
 // jQuery stuff to make the page a little easier to use
 
-$(document).ready(function(){
+$(function(){
     $(".statrow").mouseover(function() { $(this).toggleClass("highlight"); });
     $(".statrow").mouseout(function() { $(this).toggleClass("highlight"); });
 
@@ -322,7 +316,13 @@ $(document).ready(function(){
 
     $(".noneCheck").click(function() {
       top.restoreSession();
-      $.post( "../../../library/ajax/lists_touch.php", { type: this.name, patient_id: <?php echo htmlspecialchars($pid, ENT_QUOTES); ?> });
+      $.post( "../../../library/ajax/lists_touch.php",
+          {
+              type: this.name,
+              patient_id: <?php echo js_escape($pid); ?>,
+              csrf_token_form: <?php echo js_escape(CsrfUtils::collectCsrfToken()); ?>
+          }
+      );
       $(this).hide();
     });
 });
@@ -337,8 +337,8 @@ var GoBack = function () {
     location.href='demographics.php';
 }
 
-var listId = '#' + '<?php echo text($list_id); ?>';
-$(document).ready(function(){
+var listId = '#' + <?php echo js_escape($list_id); ?>;
+$(function(){
     $(listId).addClass("active");
 });
 </script>

@@ -1,24 +1,79 @@
 <?php
 /**
- * library/htmlspecialchars.inc.php Escaping Functions
+ * Escaping Functions
  *
- * Copyright © 2011 Boyd Stephen Smith Jr.
- * This file is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This file is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * @package OpenEMR
- * @author Boyd Stephen Smith Jr.
+ * @package   OpenEMR
+ * @link      https://www.open-emr.org
+ * @author    Boyd Stephen Smith Jr.
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2011 Boyd Stephen Smith Jr.
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
+
+/**
+ * Escape a javascript literal.
+ */
+function js_escape($text)
+{
+    return json_encode($text);
+}
+
+/**
+ * Escape a javascript literal within html onclick attribute.
+ */
+function attr_js($text)
+{
+    return attr(json_encode($text));
+}
+
+/**
+ * Escape html and url encode a url item.
+ */
+function attr_url($text)
+{
+    return attr(urlencode($text));
+}
+
+/**
+ * Escape js and url encode a url item.
+ */
+function js_url($text)
+{
+    return js_escape(urlencode($text));
+}
+
+/**
+ * Escape variables that are outputted into the php error log.
+ */
+function errorLogEscape($text)
+{
+    return attr($text);
+}
+
+/**
+ * Escape variables that are outputted into csv and spreadsheet files.
+ * See here: https://www.owasp.org/index.php/CSV_Injection
+ * Based mitigation strategy on this report: https://asecurityz.blogspot.com/2017/12/csv-injection-mitigations.html
+ *  1. Remove all the following characters:  = + " |
+ *  2. Only remove leading - characters (since need in dates)
+ *  3. Only remove leading @ characters (since need in email addresses)
+ *  4. Surround with double quotes (no reference link, but seems very reasonable, which will prevent commas from breaking things).
+ * If needed in future, will add a second parameter called 'options' which will be an array of option tokens that will allow
+ * less stringent (or more stringent) mechanisms to escape for csv.
+ */
+function csvEscape($text)
+{
+    // 1. Remove all the following characters:  = + " |
+    $text = preg_replace('/[=+"|]/', '', $text);
+
+    // 2. Only remove leading - characters (since need in dates)
+    // 3. Only remove leading @ characters (since need in email addresses)
+    $text = preg_replace('/^[\-@]+/', '', $text);
+
+    // 4. Surround with double quotes (no reference link, but seems very reasonable, which will prevent commas from breaking things).
+    return '"' . $text . '"';
+}
 
 /**
  * Escape a PHP string for use as (part of) an HTML / XML text node.
@@ -70,19 +125,6 @@ function attr($text)
 }
 
 /**
- * This function is a compatibility replacement for the out function removed
- *  from the CDR Admin framework.
- *
- * @param string $text The string to escape, possibly including (&), (<),
- *                     (>), ('), and (").
- * @return string The string, with (&), (<), (>), ("), and (') escaped.
- */
-function out($text)
-{
-    return attr($text);
-}
-
-/**
  * Don't call this function.  You don't see this function.  This function
  * doesn't exist.
  *
@@ -129,10 +171,18 @@ function xla($key)
 }
 
 /*
-Translate via xl() and then escape via addslashes for use with javascript literals
-*/
+ * Translate via xl() and then escape via js_escape for use with javascript literals
+ */
+function xlj($key)
+{
+    return js_escape(hsc_private_xl_or_warn($key));
+}
+
+/*
+ * Deprecated
+ *Translate via xl() and then escape via addslashes for use with javascript literals
+ */
 function xls($key)
 {
     return addslashes(hsc_private_xl_or_warn($key));
 }
-return; // Stop include / require from going any further (non-PHP)

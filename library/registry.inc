@@ -70,13 +70,13 @@ function getRegistered($state = "1", $limit = "unlimited", $offset = "0", $encou
 
 function getRegistryEntry($id, $cols = "*")
 {
-    $sql = "select $cols from registry where id=?";
+    $sql = "select " . escape_sql_column_name(process_cols_escape($cols), array('registry')) . " from registry where id=?";
     return sqlQuery($sql, array($id));
 }
 
 function getRegistryEntryByDirectory($directory, $cols = "*")
 {
-    $sql = "select $cols from registry where directory = ?";
+    $sql = "select " . escape_sql_column_name(process_cols_escape($cols), array('registry')) . " from registry where directory = ?";
     return sqlQuery($sql, $directory);
 }
 
@@ -85,7 +85,7 @@ function installSQL($dir)
     $sqltext = $dir."/table.sql";
     if ($sqlarray = @file($sqltext)) {
         $sql = implode("", $sqlarray);
-        //echo "<br>$sql<br><br>";
+        //echo "<br />$sql<br /><br />";
         $sqla = explode(";", $sql);
         foreach ($sqla as $sqlq) {
             if (strlen($sqlq) > 5) {

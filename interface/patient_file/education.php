@@ -2,18 +2,20 @@
 /**
  * This is called as a pop-up to display patient education materials.
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @author  Brady Miller <brady.g.miller@gmail.com>
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2014 Rod Roark <rod@sunsetsystems.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
- * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ * @copyright Copyright (c) 2017-2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
 require_once("../globals.php");
 require_once("$srcdir/options.inc.php");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
 $educationdir = "$OE_SITE_DIR/documents/education";
@@ -26,6 +28,10 @@ $source    = empty($_REQUEST['source'  ]) ? '' : $_REQUEST['source'  ];
 $errmsg = '';
 
 if ($_POST['bn_submit']) {
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
+    }
+
     if ($source == 'MLP') {
         // MedlinePlus Connect Web Application.  See:
         // http://www.nlm.nih.gov/medlineplus/connect/application.html
@@ -59,12 +65,12 @@ if ($_POST['bn_submit']) {
         // have the browser do it.
         if (false) {
             $data = file_get_contents($url);
-            echo $data;
+            echo text($data);
         } else { // Removed opener because this is not a dialog. sjp 12/14/17
             echo "<html><body>"
             //."<script type=\"text/javascript\" src=\"". $webroot ."/interface/main/tabs/js/include_opener.js\"></script>"
             . "<script language='JavaScript'>\n";
-            echo "document.location.href = '$url';\n";
+            echo "document.location.href = " . js_escape($url) . ";\n";
             echo "</script></body></html>\n";
         }
 
@@ -108,7 +114,7 @@ if ($_POST['bn_submit']) {
 <body class="body_top">
     <div class="container">
         <div class="row">
-            <div class="col-xs-12">
+            <div class="col-12">
                 <div class="page-header">
                     <h3>
                         <?php
@@ -131,8 +137,9 @@ if ($_POST['bn_submit']) {
             </div>
         </div>
         <div class='row'>
-            <div class='col-xs-12'>
+            <div class='col-12'>
                 <form method='post' action='education.php' onsubmit='return top.restoreSession()'>
+                    <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
                     <input type='hidden' name='type'     value='<?php echo attr($codetype); ?>' />
                     <input type='hidden' name='code'     value='<?php echo attr($codevalue); ?>' />
                     <input type='hidden' name='language' value='<?php echo attr($language); ?>' />
@@ -145,7 +152,7 @@ if ($_POST['bn_submit']) {
                     </div>
                     <div class='form-group'>
                         <div class='btn-group' role='group'>
-                            <button type='submit' class='btn btn-default btn-search' name='bn_submit' value='bn_submit'>
+                            <button type='submit' class='btn btn-secondary btn-search' name='bn_submit' value='bn_submit'>
                                 <?php echo xlt('Submit'); ?>
                             </button>
                             <button type='button' class='btn btn-link btn-cancel' onclick='window.close()'>

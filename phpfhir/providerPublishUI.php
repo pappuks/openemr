@@ -7,12 +7,11 @@
  * @link      http://www.open-emr.org
  * @author    Jerry Padgett <sjpadgett@gmail.com>
  * @copyright Copyright (c) 2018 Jerry Padgett <sjpadgett@gmail.com>
- * @license   https://www.gnu.org/licenses/agpl-3.0.en.html GNU Affero General Public License 3
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 require_once("../interface/globals.php");
 require_once("./libs/controller/ClientAppController.php");
-require 'vendor/autoload.php';
 
 use OpenEMR\Core\Header;
 
@@ -26,10 +25,6 @@ echo "<script>var pid='" . attr($pid) . "'</script>";
 <head>
     <?php Header::setupHeader(['opener']); ?>
     <script>
-        $(document).ready(function () {
-
-        });
-
         function doPublish(e, req) {
             top.restoreSession();
             e.preventDefault();
@@ -73,7 +68,7 @@ echo "<script>var pid='" . attr($pid) . "'</script>";
                 <div class="form-group">
                     <input type="text" name="q" class="form-control" placeholder="<?php echo xla('Search'); ?>">
                 </div>
-                <button type="submit" class="btn btn-default"><i class="glyphicon glyphicon-search"></i></button>
+                <button type="submit" class="btn btn-secondary"><i class="glyphicon glyphicon-search"></i></button>
             </form>
             <ul class="nav navbar-nav navbar-right">
                 <li class="dropdown ">
@@ -93,7 +88,7 @@ echo "<script>var pid='" . attr($pid) . "'</script>";
                         <li><a href="#"><?php echo xlt('Server Login'); ?></a></li>
                     </ul>
                 </li>
-                <li><a href="https://fhirtest.uhn.ca" target="_blank"><?php echo xlt('Visit Test Server'); ?></a></li>
+                <li><a href="https://fhirtest.uhn.ca" rel="noopener" target="_blank"><?php echo xlt('Visit Test Server'); ?></a></li>
             </ul>
         </div><!-- /.navbar-collapse -->
     </div><!-- /.container-fluid -->
@@ -125,15 +120,15 @@ echo "<script>var pid='" . attr($pid) . "'</script>";
     </div>
 
     <div class="col-md-10 content">
-        <div class="panel panel-default">
-            <div class="panel-heading">
+        <div class="card panel-default">
+            <div class="card-heading">
                 <?php echo xlt('Dashboard'); ?>
             </div>
-            <div id="dashboard" class="panel-body">
+            <div id="dashboard" class="card-body">
             </div>
         </div>
     </div>
-    <footer class="pull-left footer">
+    <footer class="float-left footer">
         <p class="col-md-12">
         <hr class="divider">
         </p>

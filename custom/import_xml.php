@@ -13,8 +13,9 @@
 
 require_once("../interface/globals.php");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/acl.inc");
 
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Core\Header;
 
 function setInsurance($pid, $ainsurance, $asubscriber, $seq)
@@ -51,13 +52,13 @@ function setInsurance($pid, $ainsurance, $asubscriber, $seq)
 }
 
  // Check authorization.
-if (!acl_check('patients', 'demo', '', 'write')) {
+if (!AclMain::aclCheckCore('patients', 'demo', '', 'write')) {
     die("Updating demographics is not authorized.");
 }
 
 if ($_POST['form_import']) {
-    if (!verifyCsrfToken($_POST["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_POST["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     $apatient    = array();
@@ -124,7 +125,7 @@ if ($_POST['form_import']) {
 
     $olddata = getPatientData($pid);
 
-    if ($olddata['squad'] && ! acl_check('squads', $olddata['squad'])) {
+    if ($olddata['squad'] && ! AclMain::aclCheckCore('squads', $olddata['squad'])) {
         die("You are not authorized to access this squad.");
     }
 
@@ -205,20 +206,20 @@ if ($_POST['form_import']) {
 </head>
 <body class="body_top" onload="javascript:document.forms[0].form_import_data.focus()">
 <form method='post' action="import_xml.php" onsubmit="return top.restoreSession()">
-    <input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+    <input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
     <div class="container">
         <div class="row">
-            <div class="col-xs-12">
+            <div class="col-12">
                 <div class="form-group"></div>
                 <div class="form-group">
                     <textarea name='form_import_data' class='form-control' rows='10'></textarea>
                 </div>
                 <div class="form-group text-right">
                     <div class="btn-group" role="group">
-                        <button type='submit' class='btn btn-default btn-save' name='form_import' value='bn_import'>
+                        <button type='submit' class='btn btn-secondary btn-save' name='form_import' value='bn_import'>
                             <?php echo xlt('Import'); ?>
                         </button>
-                        <button type="button" class="btn btn-link btn-cancel" onclick="window.close()">
+                        <button type="button" class="btn btn-link btn-cancel" onclick="dlgclose()">
                             <?php echo xlt("Cancel"); ?>
                         </button>
                     </div>

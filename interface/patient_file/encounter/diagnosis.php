@@ -1,12 +1,21 @@
 <?php
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
+/**
+ * diagnosis.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
 
 require_once("../../globals.php");
-require_once("$srcdir/billing.inc");
-require_once("$srcdir/acl.inc");
+
+use OpenEMR\Billing\BillingUtilities;
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 $mode              = $_REQUEST['mode'];
 $type              = $_REQUEST['type'];
@@ -34,8 +43,8 @@ if ($payment_method == "insurance") {
 }
 
 if (isset($mode)) {
-    if (!verifyCsrfToken($_GET["csrf_token_form"])) {
-        csrfNotVerified();
+    if (!CsrfUtils::verifyCsrfToken($_GET["csrf_token_form"])) {
+        CsrfUtils::csrfNotVerified();
     }
 
     if ($mode == "add") {
@@ -48,7 +57,7 @@ if (isset($mode)) {
         $provid = $tmp['id'] ? $tmp['id'] : $_SESSION["authUserID"];
 
         if (strtolower($type) == "copay") {
-            addBilling(
+            BillingUtilities::addBilling(
                 $encounter,
                 $type,
                 sprintf("%01.2f", $code),
@@ -61,7 +70,7 @@ if (isset($mode)) {
                 sprintf("%01.2f", 0 - $code)
             );
         } elseif (strtolower($type) == "other") {
-            addBilling(
+            BillingUtilities::addBilling(
                 $encounter,
                 $type,
                 $code,
@@ -85,7 +94,7 @@ if (isset($mode)) {
                 }
             }
 
-            addBilling(
+            BillingUtilities::addBilling(
                 $encounter,
                 $type,
                 $code,
@@ -142,8 +151,7 @@ if (isset($mode)) {
 ?>
 <html>
 <head>
-<?php html_header_show();?>
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
+<?php Header::setupHeader(); ?>
 
 <script language="JavaScript">
 
@@ -171,16 +179,16 @@ function validate(f) {
     }
    }
    if (!ndcok) {
-    alert('<?php echo xls('Format incorrect for NDC'); ?> "' + ndc +
-     '", <?php echo xls('should be like nnnnn-nnnn-nn'); ?>');
+    alert(<?php echo xlj('Format incorrect for NDC'); ?> + ' ' + ndc +
+     ', ' + <?php echo xlj('should be like nnnnn-nnnn-nn'); ?>);
     if (f[pfx+'[ndcnum]'].focus) f[pfx+'[ndcnum]'].focus();
     return false;
    }
    // Check for valid quantity.
    var qty = f[pfx+'[ndcqty]'].value - 0;
    if (isNaN(qty) || qty <= 0) {
-    alert('<?php echo xls('Quantity for NDC'); ?> "' + ndc +
-     '" <?php echo xls('is not valid (decimal fractions are OK).'); ?>');
+    alert(<?php echo xlj('Quantity for NDC'); ?> + ' ' + ndc +
+     ' ' + <?php echo xlj('is not valid (decimal fractions are OK).'); ?>);
     if (f[pfx+'[ndcqty]'].focus) f[pfx+'[ndcqty]'].focus();
     return false;
    }
@@ -197,30 +205,30 @@ function validate(f) {
 <body class="body_bottom">
 
 <?php
- $thisauth = acl_check('encounters', 'coding_a');
+ $thisauth = AclMain::aclCheckCore('encounters', 'coding_a');
 if (!$thisauth) {
     $erow = sqlQuery("SELECT user FROM forms WHERE " .
     "encounter = ? AND formdir = 'newpatient' LIMIT 1", array($encounter));
     if ($erow['user'] == $_SESSION['authUser']) {
-        $thisauth = acl_check('encounters', 'coding');
+        $thisauth = AclMain::aclCheckCore('encounters', 'coding');
     }
 }
 
 if ($thisauth) {
     $tmp = getPatientData($pid, "squad");
-    if ($tmp['squad'] && ! acl_check('squads', $tmp['squad'])) {
+    if ($tmp['squad'] && ! AclMain::aclCheckCore('squads', $tmp['squad'])) {
         $thisauth = 0;
     }
 }
 
 if (!$thisauth) {
-    echo "<p>(".xlt('Coding not authorized').")</p>\n";
+    echo "<p>(" . xlt('Coding not authorized') . ")</p>\n";
     echo "</body>\n</html>\n";
     exit();
 }
 ?>
 
-<form name="diagnosis" method="post" action="diagnosis.php?mode=justify&csrf_token_form=<?php echo attr(urlencode(collectCsrfToken())); ?>"
+<form name="diagnosis" method="post" action="diagnosis.php?mode=justify&csrf_token_form=<?php echo attr_url(CsrfUtils::collectCsrfToken()); ?>"
  onsubmit="return validate(this)">
 <table border=0 cellspacing=0 cellpadding=0 height=100%>
 <tr>
@@ -246,12 +254,12 @@ if (!empty($_GET["back"]) || !empty($_POST["back"])) {
 </dt>
 </dl>
 
-<a href="cash_receipt.php?" class='link_submit' target='new' onclick='top.restoreSession()'>
+<a href="cash_receipt.php?csrf_token_form=<?php echo attr_url(CsrfUtils::collectCsrfToken()); ?>" class='link_submit' target='new' onclick='top.restoreSession()'>
 [<?php echo xlt('Receipt'); ?>]
 </a>
 <table border="0">
 <?php
-if ($result = getBillingByEncounter($pid, $encounter, "*")) {
+if ($result = BillingUtilities::getBillingByEncounter($pid, $encounter, "*")) {
     $billing_html = array();
     $total = 0.0;
     $ndclino = 0;
@@ -263,7 +271,7 @@ if ($result = getBillingByEncounter($pid, $encounter, "*")) {
                     attr($iter["code"]) . ']" type="checkbox" value="' . attr($iter["code"]) . '">' .
                     "</td><td><div><a target='" . attr($target) . "' class='small' " .
             "href='diagnosis_full.php' onclick='top.restoreSession()'><b>" .
-                    text($iter{"code"}) . "</b> " . text($iter{"code_text"}) .
+                    text($iter["code"]) . "</b> " . text($iter["code_text"]) .
                     "</a></div></td></tr>\n";
                 $billing_html[$iter["code_type"]] .= $html;
                 $counter++;
@@ -281,8 +289,8 @@ if ($result = getBillingByEncounter($pid, $encounter, "*")) {
                 attr($iter["code"]) . ']" type="checkbox" value="' . attr($iter["code"]) . '">' .
                 "</td><td><a target='$target' class='small' " .
             "href='diagnosis_full.php' onclick='top.restoreSession()'><b>" .
-                text($iter{"code"}) . ' ' . text($iter['modifier']) . "</b> " .
-                text(ucwords(strtolower($iter{"code_text"}))) . ' ' . text(oeFormatMoney($iter['fee'])) .
+                text($iter["code"]) . ' ' . text($iter['modifier']) . "</b> " .
+                text(ucwords(strtolower($iter["code_text"]))) . ' ' . text(oeFormatMoney($iter['fee'])) .
                 "</a><span class=\"small\">";
             $total += $iter['fee'];
             $js = explode(":", $iter['justify']);

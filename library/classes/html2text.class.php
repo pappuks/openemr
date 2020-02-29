@@ -17,7 +17,7 @@
  * (at your option) any later version.                                   *
  *                                                                       *
  * The GNU General Public License can be found at                        *
- * http://www.gnu.org/copyleft/gpl.html.                                 *
+ * https://www.gnu.org/copyleft/gpl.html.                                 *
  *                                                                       *
  * This script is distributed in the hope that it will be useful,        *
  * but WITHOUT ANY WARRANTY; without even the implied warranty of        *
@@ -39,11 +39,11 @@
  *
  *  Updated set_html() function's file reading mechanism, 9/25/03.
  *
- *  Thanks to Joss Sanglier (http://www.dancingbear.co.uk/) for adding
+ *  Thanks to Joss Sanglier (https://www.dancingbear.co.uk/) for adding
  *  several more HTML entity codes to the $search and $replace arrays.
  *  Updated 11/7/03.
  *
- *  Thanks to Darius Kasperavicius (http://www.dar.dar.lt/) for
+ *  Thanks to Darius Kasperavicius (https://www.dar.dar.lt/) for
  *  suggesting the addition of $allowed_tags and its supporting function
  *  (which I slightly modified). Updated 3/12/04.
  *
@@ -57,7 +57,7 @@
  *  rendered email address.
  *  Updated 12/16/04.
  *
- *  Thanks to Wojciech Bajon (http://histeria.pl/) for submitting code
+ *  Thanks to Wojciech Bajon (https://histeria.pl/) for submitting code
  *  to handle relative links, which I hadn't considered. I modified his
  *  code a bit to handle normal HTTP links and MAILTO links. Also for
  *  suggesting three additional HTML entity codes to search for.
@@ -67,29 +67,29 @@
  *  for the _build_link_list() function: "https".
  *  Updated 04/06/05.
  *
- *  Thanks to Marc Bertrand (http://www.dresdensky.com/) for
+ *  Thanks to Marc Bertrand (https://www.dresdensky.com/) for
  *  suggesting a revision to the word wrapping functionality; if you
  *  specify a $width of 0 or less, word wrapping will be ignored.
  *  Updated 11/02/06.
  *
  *  *** Big housecleaning updates below:
  *
- *  Thanks to Colin Brown (http://www.sparkdriver.co.uk/) for
+ *  Thanks to Colin Brown (https://www.sparkdriver.co.uk/) for
  *  suggesting the fix to handle </li> and blank lines (whitespace).
- *  Christian Basedau (http://www.movetheweb.de/) also suggested the
+ *  Christian Basedau (https://www.movetheweb.de/) also suggested the
  *  blank lines fix.
  *
- *  Special thanks to Marcus Bointon (http://www.synchromedia.co.uk/),
+ *  Special thanks to Marcus Bointon (https://www.synchromedia.co.uk/),
  *  Christian Basedau, Norbert Laposa (http://ln5.co.uk/),
  *  Bas van de Weijer, and Marijn van Butselaar
  *  for pointing out my glaring error in the <th> handling. Marcus also
  *  supplied a host of fixes.
  *
- *  Thanks to Jeffrey Silverman (http://www.newtnotes.com/) for pointing
+ *  Thanks to Jeffrey Silverman (https://www.newtnotes.com/) for pointing
  *  out that extra spaces should be compressed--a problem addressed with
  *  Marcus Bointon's fixes but that I had not yet incorporated.
  *
- *  Thanks to Daniel Schledermann (http://www.typoconsult.dk/) for
+ *  Thanks to Daniel Schledermann (https://www.typoconsult.dk/) for
  *  suggesting a valuable fix with <a> tag handling.
  *
  *  Thanks to Wojciech Bajon (again!) for suggesting fixes and additions,
@@ -156,7 +156,7 @@ class html2text
         '/<h[123][^>]*>(.*?)<\/h[123]>/ie',      // H1 - H3
         '/<h[456][^>]*>(.*?)<\/h[456]>/ie',      // H4 - H6
         '/<p[^>]*>/i',                           // <P>
-        '/<br[^>]*>/i',                          // <br>
+        '/<br[^>]*>/i',                          // <br />
         '/<b[^>]*>(.*?)<\/b>/ie',                // <b>
         '/<strong[^>]*>(.*?)<\/strong>/ie',      // <strong>
         '/<i[^>]*>(.*?)<\/i>/i',                 // <i>
@@ -208,7 +208,7 @@ class html2text
         "strtoupper(\"\n\n\\1\n\n\")",          // H1 - H3
         "ucwords(\"\n\n\\1\n\n\")",             // H4 - H6
         "\n\n\t",                               // <P>
-        "\n",                                   // <br>
+        "\n",                                   // <br />
         'strtoupper("\\1")',                    // <b>
         'strtoupper("\\1")',                    // <strong>
         '_\\1_',                                // <i>
@@ -469,7 +469,7 @@ class html2text
     function _build_link_list($link, $display)
     {
         if (substr($link, 0, 7) == 'http://' || substr($link, 0, 8) == 'https://' ||
-             substr($link, 0, 7) == 'mailto:' ) {
+             substr($link, 0, 7) == 'mailto:') {
             $this->_link_count++;
             $this->_link_list .= "[" . $this->_link_count . "] $link\n";
             $additional = ' [' . $this->_link_count . ']';

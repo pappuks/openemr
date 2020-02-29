@@ -1,4 +1,16 @@
 <?php
+/**
+ * CAMOS content_parser.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Mark Leeds <drleeds@gmail.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2006-2009 Mark Leeds <drleeds@gmail.com>
+ * @copyright Copyright (c) 2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
 
 require_once("../../../library/api.inc");
 
@@ -7,7 +19,7 @@ function addAppt($days, $time)
     $sql = "insert into openemr_postcalendar_events (pc_pid, pc_eventDate," .
     "pc_comments, pc_aid,pc_startTime) values (?, date_add(current_date(), interval " . add_escape_custom($days) .
     " day),'from CAMOS', ?, ?)";
-    return sqlInsert($sql, array($_SESSION['pid'], $_SESSION['authId'], $time));
+    return sqlInsert($sql, array($_SESSION['pid'], $_SESSION['authUserID'], $time));
 }
 function addVitals($weight, $height, $systolic, $diastolic, $pulse, $temp)
 {
@@ -25,7 +37,7 @@ function addVitals($weight, $height, $systolic, $diastolic, $pulse, $temp)
     echo $c->default_action_process($_POST);
 }
 
-//This function was copied from billing.inc and altered to support 'justify'
+//This function was copied from BillingUtilities class and altered to support 'justify'
 function addBilling2($encounter, $code_type, $code, $code_text, $modifier = "", $units = "", $fee = "0.00", $justify)
 {
     $justify_string = '';
@@ -46,7 +58,7 @@ function addBilling2($encounter, $code_type, $code, $code_text, $modifier = "", 
 
     $sql = "insert into billing (date, encounter, code_type, code, code_text, pid, authorized, user, groupname,activity,billed,provider_id,modifier,units,fee,justify) values (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)";
 
-    return sqlInsert($sql, array($_SESSION['encounter'], $code_type, $code, $code_text, $_SESSION['pid'], $authorized, $_SESSION['authId'], $_SESSION['authProvider'], $_SESSION['authUserID'], $modifier, $units, $fee, $justify_string));
+    return sqlInsert($sql, array($_SESSION['encounter'], $code_type, $code, $code_text, $_SESSION['pid'], $authorized, $_SESSION['authUserID'], $_SESSION['authProvider'], $_SESSION['authUserID'], $modifier, $units, $fee, $justify_string));
 }
 
 function content_parser($input)

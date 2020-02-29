@@ -1,28 +1,27 @@
 <?php
-/********************************************************************************\
- * Copyright (C) ViCarePlus, Visolve (vicareplus_engg@visolve.com)              *
- *                                                                              *
- * This program is free software; you can redistribute it and/or                *
- * modify it under the terms of the GNU General Public License                  *
- * as published by the Free Software Foundation; either version 2               *
- * of the License, or (at your option) any later version.                       *
- *                                                                              *
- * This program is distributed in the hope that it will be useful,              *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of               *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                *
- * GNU General Public License for more details.                                 *
- *                                                                              *
- * You should have received a copy of the GNU General Public License            *
- * along with this program; if not, write to the Free Software                  *
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.  *
- \********************************************************************************/
+/**
+ * re_identification_input_screen.php
+ *
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Visolve <vicareplus_engg@visolve.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @copyright Copyright (c) 2010 ViCarePlus, Visolve <vicareplus_engg@visolve.com>
+ * @copyright Copyright (c) 2018-2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
+
 require_once("../globals.php");
 require_once("$srcdir/lists.inc");
 require_once("$srcdir/patient.inc");
-require_once("$srcdir/acl.inc");
 require_once("$srcdir/options.inc.php");
 
-if (!acl_check('admin', 'super')) {
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
+
+if (!AclMain::aclCheckCore('admin', 'super')) {
     die(xlt('Not authorized'));
 }
 
@@ -30,9 +29,8 @@ if (!acl_check('admin', 'super')) {
 <html>
 <head>
 <title><?php echo xlt('Re Identification'); ?></title>
-<link rel="stylesheet" href='<?php echo $css_header ?>' type='text/css'>
 
-<script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/dialog.js?v=<?php echo $v_js_includes; ?>"></script>
+    <?php Header::setupHeader(); ?>
 
 <style type="text/css">
 .style1 {
@@ -45,7 +43,7 @@ function form_validate()
 
  if(document.forms[0].re_id_code.value == "undefined" || document.forms[0].re_id_code.value == "")
  {
-  alert("<?php echo xls('Enter the Re Identification code');?>");
+  alert(<?php echo xlj('Enter the Re Identification code'); ?>);
   return false;
  }
  top.restoreSession();
@@ -54,9 +52,7 @@ function form_validate()
 
 function download_file()
 {
- alert("<?php echo xls('Re-identification files will be saved in');
-    echo ' `' . addslashes($GLOBALS['temporary_files_dir']) . '` ';
-    echo xls('location of the openemr machine and may contain sensitive data, so it is recommended to manually delete the files after its use');?>");
+ alert(<?php echo xlj('Re-identification files will be saved in'); ?> + ' `' + <?php echo js_escape($GLOBALS['temporary_files_dir']); ?> + '` ' + <?php echo xlj('location of the openemr machine and may contain sensitive data, so it is recommended to manually delete the files after its use'); ?>);
  document.re_identification.submit();
 }
 
@@ -68,7 +64,7 @@ function download_file()
     style="position: absolute; visibility: hidden; z-index: 1000;"></div>
 <form name="re_identification" enctype="Re_identification_ip_single_code"
     action="re_identification_op_single_patient.php" method="POST" onsubmit="return form_validate();">
-<input type="hidden" name="csrf_token_form" value="<?php echo attr(collectCsrfToken()); ?>" />
+<input type="hidden" name="csrf_token_form" value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>" />
     <?php
     $row = sqlQuery("SHOW TABLES LIKE 'de_identification_status'");
     if (empty($row)) {
@@ -80,11 +76,11 @@ function download_file()
     <tr valign="top">
         <td>&nbsp;</td>
         <td rowspan="3">
-        <br>
+        <br />
         <?php echo xlt('Please upgrade OpenEMR Database to include De Identification procedures, function, tables'); ?>
-       </br></br><a  target="Blank" href="../../contrib/util/de_identification_upgrade.php"><?php echo xlt('Click here');?></a>
+       <br /><br /><a  target="Blank" href="../../contrib/util/de_identification_upgrade.php"><?php echo xlt('Click here');?></a>
         <?php echo xlt('to run');
-        echo " de_identification_upgrade.php</br>";?><br>
+        echo " de_identification_upgrade.php<br />";?><br />
            </td>
            <td>&nbsp;</td>
        </tr>
@@ -112,7 +108,7 @@ function download_file()
 
         if ($reIdentificationStatus == 1) {
             //1 - A Re Identification process is currently in progress
-                ?>
+            ?>
         <table>
         <tr>
             <td>&nbsp;</td>
@@ -126,11 +122,11 @@ function download_file()
         <table class="de_identification_status_message" align="center">
         <tr valign="top">
             <td>&nbsp;</td>
-            <td rowspan="3"><br>
+            <td rowspan="3"><br />
                 <?php echo xlt('Re Identification Process is ongoing');
-                echo "</br></br>";
+                echo "<br /><br />";
                 echo xlt('Please visit Re Identification screen after some time');
-                echo "</br>";   ?> <br>
+                echo "<br />";   ?> <br />
             </td>
             <td>&nbsp;</td>
         </tr>
@@ -146,13 +142,13 @@ function download_file()
                 <?php
         } else if ($reIdentificationStatus == 0) {
            //0 - There is no Re Identification in progress. (start new Re Identification process)
-                ?>
-        <center></br>
-        </br>
+            ?>
+        <center><br />
+        <br />
                 <?php echo xlt('Enter the Re Identification code'); ?> <input
         type='text' size='50' name='re_id_code' id='re_id_code'
-           title='<?php echo xla('Enter the Re Identification code'); ?>' /> </br>
-        </br>
+           title='<?php echo xla('Enter the Re Identification code'); ?>' /> <br />
+        <br />
            <Input type="Submit" Name="Submit" Value=<?php echo xla("submit");?>></center>
             <?php
         } else if ($reIdentificationStatus == 2) {
@@ -181,11 +177,11 @@ function download_file()
          <table class="de_identification_status_message" align="center">
          <tr valign="top">
              <td>&nbsp;</td>
-             <td rowspan="3"><br>
+             <td rowspan="3"><br />
                 <?php echo xlt('No Patient record found for the given Re Identification code');
-                echo "</br></br>";
+                echo "<br /><br />";
                 echo xlt('Please enter the correct Re Identification code');
-                echo "</br>";   ?> </br>
+                echo "<br />";   ?> <br />
              </td>
              <td>&nbsp;</td>
          </tr>
@@ -221,11 +217,11 @@ function download_file()
          <table class="de_identification_status_message"" align="center">
          <tr valign="top">
              <td>&nbsp;</td>
-             <td rowspan="3"><br>
+             <td rowspan="3"><br />
                 <?php echo xlt('Re Identification Process is completed');
-                echo "</br></br>";
+                echo "<br /><br />";
                 echo xlt('Please Click download button to download the Re Identified data');
-                echo "</br>";   ?> <br>
+                echo "<br />";   ?> <br />
              </td>
              <td>&nbsp;</td>
          </tr>

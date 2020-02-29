@@ -2,17 +2,19 @@
 /**
  * Trending script for graphing objects.
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Brady Miller <brady.g.miller@gmail.com>
- * @author  Rod Roark <rod@sunsetsystems.com>
- * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
- * @copyright Copyright (c) 2010-2017 Brady Miller <brady.g.miller@gmail.com>
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Rod Roark <rod@sunsetsystems.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  * @copyright Copyright (c) 2011 Rod Roark <rod@sunsetsystems.com>
+ * @copyright Copyright (c) 2010-2018 Brady Miller <brady.g.miller@gmail.com>
  */
 
-$special_timeout = 3600;
 require_once("../../globals.php");
+
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Core\Header;
 
 $formname = $_GET["formname"];
 $is_lbf = substr($formname, 0, 3) === 'LBF';
@@ -30,11 +32,15 @@ if ($is_lbf) {
 
 //Bring in the style sheet
 ?>
-
 <?php require $GLOBALS['srcdir'] . '/js/xl/dygraphs.js.php'; ?>
 
-<link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
-<link rel="stylesheet" href="<?php echo $GLOBALS['assets_static_relative']; ?>/modified/dygraphs-2-0-0/dygraph.css" type="text/css"></script>
+<?php
+// Special case where not setting up the header for a script, so using setupAssets function,
+//  which does not autoload anything. The actual header is set up in the script called at
+//  the bottom of this script.
+Header::setupAssets(['dygraphs', 'jquery']);
+?>
+
 <?php
 // Hide the current value css entries. This is currently specific
 //  for the vitals form but could use this mechanism for other
@@ -59,9 +65,6 @@ if ($is_lbf) {
   }
 </style>
 
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/jquery-1-7-2/jquery.min.js"></script>
-<script type="text/javascript" src="<?php echo $GLOBALS['assets_static_relative']; ?>/modified/dygraphs-2-0-0/dygraph.js?v=<?php echo $v_js_includes; ?>"></script>
-
 <script type="text/javascript">
 
 
@@ -73,8 +76,9 @@ function show_graph(table_graph, name_graph, title_graph)
     type: 'POST',
         data: ({
             table: table_graph,
-              name: name_graph,
-              title: title_graph
+            name: name_graph,
+            title: title_graph,
+            csrf_token_form: <?php echo js_escape(CsrfUtils::collectCsrfToken()); ?>
         }),
         dataType: "json",
         success: function(returnData){
@@ -100,17 +104,17 @@ function show_graph(table_graph, name_graph, title_graph)
             // hide the chart div
           $('#chart').hide();
           if(!title_graph){
-              alert("<?php echo xlt('This item does not have enough data to graph');?>" + ".\n" +"<?php echo xlt('Please select an item that has more data');?>" + ".");
+              alert(<?php echo xlj('This item does not have enough data to graph');?> + ".\n" + <?php echo xlj('Please select an item that has more data');?> + ".");
           }
           else {
-              alert(title_graph + " " + "<?php echo xlt('does not have enough data to graph');?>" + ".\n" + "<?php echo xlt('Please select an item that has more data');?>" + ".");
+              alert(title_graph + " " + <?php echo xlj('does not have enough data to graph');?> + ".\n" + <?php echo xlj('Please select an item that has more data');?> + ".");
           }
-          
+
         }
     });
 }
 
-$(document).ready(function(){
+$(function (){
 
   // Use jquery to show the 'readonly' class entries
   $('.readonly').show();
@@ -118,25 +122,25 @@ $(document).ready(function(){
   // Place click callback for graphing
 <?php if ($is_lbf) { ?>
   // For LBF the <td> has an id of label_id_$fieldid
-  $(".graph").click(function(e){ show_graph('<?php echo $formname; ?>', this.id.substring(9), $(this).text()) });
+  $(".graph").on("click", function(e){ show_graph(<?php echo js_escape($formname); ?>, this.id.substring(9), $(this).text()) });
 <?php } else { ?>
-  $(".graph").click(function(e){ show_graph('form_vitals', this.id, $(this).text()) });
+  $(".graph").on("click", function(e){ show_graph('form_vitals', this.id, $(this).text()) });
 <?php } ?>
 
   // Show hovering effects for the .graph links
-  $(".graph").hover(
+  $(".graph").on("mouseenter",
     function(){
-         $(this).css({color:'#ff5555'}); //mouseover
-    },
+         $(this).css({color:'#ff5555'});
+    }).on("mouseleave",
     function(){
-         $(this).css({color:'#0000cc'}); // mouseout
+         $(this).css({color:'#0000cc'});
     }
   );
 
   // show blood pressure graph by default
 <?php if ($is_lbf) { ?>
-<?php if (!empty($default)) { ?>
-  show_graph('<?php echo $formname; ?>','<?php echo $default['field_id']; ?>','<?php echo $default['title']; ?>');
+    <?php if (!empty($default)) { ?>
+  show_graph(<?php echo js_escape($formname); ?>,<?php echo js_escape($default['field_id']); ?>,<?php echo js_escape($default['title']); ?>);
 <?php } ?>
 <?php } else { ?>
   show_graph('form_vitals','bps','');

@@ -1,19 +1,14 @@
 <?php
 ////////////////////////////////////////////////////////////////////
-// Form:	Psychiatrisch Onderzoek
-// Package:	Report of First visit - Dutch specific form
-// Created by:	Larry Lart
-// Version:	1.0 - 29-03-2008
+// Form:    Psychiatrisch Onderzoek
+// Package: Report of First visit - Dutch specific form
+// Created by:  Larry Lart
+// Version: 1.0 - 29-03-2008
 ////////////////////////////////////////////////////////////////////
 
-include_once("../../globals.php");
-include_once("$srcdir/api.inc");
-include_once("$srcdir/forms.inc");
-
-foreach ($_POST as $k => $var) {
-    $_POST[$k] = add_escape_custom($var);
-  // echo "$var\n";
-}
+require_once("../../globals.php");
+require_once("$srcdir/api.inc");
+require_once("$srcdir/forms.inc");
 
 if ($encounter == "") {
     $encounter = date("Ymd");
@@ -28,27 +23,28 @@ if ($_GET["mode"] == "new") {
         addForm($encounter, "Psychiatric Examination", $newid, "psychiatrisch_onderzoek", $pid, $userauthorized);
     } else {
         echo "lalala 2";
-      
+
         $_POST['autosave_flag'] = 0;
      /// $newid = formUpdate( "form_psychiatrisch_onderzoek", $_POST, $_GET["saveid"], $userauthorized );
     }
 } elseif ($_GET["mode"] == "update") {
     $strSql = "UPDATE form_psychiatrisch_onderzoek
-                SET pid = ".$_SESSION["pid"].", groupname='".$_SESSION["authProvider"]."', user='".$_SESSION["authUser"]."', 
-                authorized=$userauthorized, activity=1, date = NOW(), 
-                datum_onderzoek='".$_POST["datum_onderzoek"]."',
-                reden_van_aanmelding='".$_POST["reden_van_aanmelding"]."', 
-                conclusie_van_intake='".$_POST["conclusie_van_intake"]."',
-                medicatie='".$_POST["medicatie"]."',
-                anamnese='".$_POST["anamnese"]."',
-                psychiatrisch_onderzoek='".$_POST["psychiatrisch_onderzoek"]."',
-                beschrijvende_conclusie='".$_POST["beschrijvende_conclusie"]."',
-                behandelvoorstel='".$_POST["behandelvoorstel"]."',
-                autosave_flag=0, 
+                SET pid = ?, groupname=?, user=?, 
+                authorized=?, activity=1, date = NOW(), 
+                datum_onderzoek=?,
+                reden_van_aanmelding=?,
+                conclusie_van_intake=?,
+                medicatie=?,
+                anamnese=?,
+                psychiatrisch_onderzoek=?,
+                beschrijvende_conclusie=?,
+                behandelvoorstel=?,
+                autosave_flag=1, 
                 autosave_datetime=NOW() 
-                  WHERE id = ".$_GET["id"].";";
+                  WHERE id = ?;";
 
-    sqlQuery($strSql);
+    sqlQuery($strSql, array($_SESSION["pid"], $_SESSION["authProvider"], $_SESSION["authUser"], $userauthorized, $_POST["datum_onderzoek"], $_POST["reden_van_aanmelding"],
+    $_POST["conclusie_van_intake"], $_POST["medicatie"], $_POST["anamnese"], $_POST["psychiatrisch_onderzoek"], $_POST["beschrijvende_conclusie"], $_POST["behandelvoorstel"], $_GET["id"]));
 }
 
 $_SESSION["encounter"] = $encounter;

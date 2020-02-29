@@ -16,6 +16,8 @@ require_once("$srcdir/pnotes.inc");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/auth.inc");
 
+use OpenEMR\Common\Acl\AclMain;
+
 function lab_results_messages($set_pid, $rid, $provider_id = "")
 {
     global $userauthorized;
@@ -35,12 +37,12 @@ function lab_results_messages($set_pid, $rid, $provider_id = "")
     if (!empty($result)) {
         foreach ($result as $user_detail) {
             unset($thisauth); // Make sure it is empty.
-            // Check user authorization. Only send the panding review message to authorised user.
-            // $thisauth = acl_check('patients', 'sign', $user_detail['username']);
+            // Check user authorization. Only send the pending review message to authorised user.
+            // $thisauth = AclMain::aclCheckCore('patients', 'sign', $user_detail['username']);
 
             // Route message to administrators if there is no provider match.
             if ($provider_id == "") {
-                $thisauth = acl_check('admin', 'super', $user_detail['username']);
+                $thisauth = AclMain::aclCheckCore('admin', 'super', $user_detail['username']);
             } else {
                 $thisauth = true;
             }
@@ -48,7 +50,7 @@ function lab_results_messages($set_pid, $rid, $provider_id = "")
             if ($thisauth) {
                 // Send lab result message to the ordering provider when there is a new lab report.
                 $pname = getPatientName($set_pid);
-                $link = "<a href='../../orders/orders_results.php?review=1&set_pid=" . attr(urlencode($set_pid)) . "'" .
+                $link = "<a href='../../orders/orders_results.php?review=1&set_pid=" . attr_url($set_pid) . "'" .
                 " onclick='return top.restoreSession()'>here</a>";
                 $note = "Patient $pname's lab results have arrived. Please click $link to review them.<br/>";
                 $note_type = "Lab Results";

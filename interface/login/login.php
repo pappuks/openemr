@@ -2,18 +2,8 @@
 /**
  * Login screen.
  *
- * LICENSE: This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://opensource.org/licenses/gpl-license.php>;.
- *
  * @package OpenEMR
+ * @link      http://www.open-emr.org
  * @author  Rod Roark <rod@sunsetsystems.com>
  * @author  Brady Miller <brady.g.miller@gmail.com>
  * @author  Kevin Yeh <kevin.y@integralemr.com>
@@ -22,14 +12,16 @@
  * @author  Julia Longtin <julialongtin@diasp.org>
  * @author  cfapress
  * @author  markleeds
- * @link    http://www.open-emr.org
+ * @copyright Copyright (c) 2019 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
 
 use OpenEMR\Core\Header;
+use OpenEMR\Services\FacilityService;
 
-$ignoreAuth=true;
+$ignoreAuth = true;
 require_once("../globals.php");
 
 // mdsupport - Add 'App' functionality for user interfaces without standard menu and frames
@@ -37,23 +29,21 @@ require_once("../globals.php");
 //
 // Build a list of valid entries
 $emr_app = array();
-if ($GLOBALS['new_tabs_layout']) {
-    $rs = sqlStatement(
-        "SELECT option_id, title,is_default FROM list_options
-			WHERE list_id=? and activity=1 ORDER BY seq, option_id",
-        array ('apps')
-    );
-    if (sqlNumRows($rs)) {
-        while ($app = sqlFetchArray($rs)) {
-            $app_req = explode('?', trim($app['title']));
-            if (! file_exists('../'.$app_req[0])) {
-                continue;
-            }
+$rs = sqlStatement(
+    "SELECT option_id, title,is_default FROM list_options
+        WHERE list_id=? and activity=1 ORDER BY seq, option_id",
+    array ('apps')
+);
+if (sqlNumRows($rs)) {
+    while ($app = sqlFetchArray($rs)) {
+        $app_req = explode('?', trim($app['title']));
+        if (! file_exists('../'.$app_req[0])) {
+            continue;
+        }
 
-                $emr_app [trim($app ['option_id'])] = trim($app ['title']);
-            if ($app ['is_default']) {
-                $emr_app_def = $app ['option_id'];
-            }
+            $emr_app [trim($app ['option_id'])] = trim($app ['title']);
+        if ($app ['is_default']) {
+            $emr_app_def = $app ['option_id'];
         }
     }
 }
@@ -81,7 +71,7 @@ if (count($emr_app)) {
         $div_app = sprintf(
             '
 <div id="divApp" class="form-group">
-	<label for="appChoice" class="control-label text-right">%s:</label>
+	<label for="appChoice" class="text-right">%s:</label>
     <div>
         <select class="form-control" id="selApp" name="appChoice" size="1">%s</select>
     </div>
@@ -95,12 +85,12 @@ if (count($emr_app)) {
 ?>
 <html>
 <head>
-    <title><?php echo text($openemr_name) . " " . xlt('Login'); ?></title>
+    <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
     <?php Header::setupHeader(['jquery-ui', 'jquery-ui-darkness']); ?>
 
-    <link rel="stylesheet" href="../themes/login.css?v=<?php echo $v_js_includes; ?>" type="text/css">
+    <title><?php echo text($openemr_name) . " " . xlt('Login'); ?></title>
 
     <link rel="shortcut icon" href="<?php echo $GLOBALS['images_static_relative']; ?>/favicon.ico" />
 
@@ -116,20 +106,18 @@ if (count($emr_app)) {
             'registeredId' => xla('Registered id'),
             'genericError' => xla('Error. Try again later'),
             'closeTooltip' => ''
-        ));
-        ?>;
+        )); ?>;
 
         var registrationConstants = <?php echo json_encode(array(
             'webroot' => $GLOBALS['webroot']
-        ))
-        ?>;
+        )); ?>;
     </script>
 
     <script type="text/javascript" src="<?php echo $webroot ?>/interface/product_registration/product_registration_service.js?v=<?php echo $v_js_includes; ?>"></script>
     <script type="text/javascript" src="<?php echo $webroot ?>/interface/product_registration/product_registration_controller.js?v=<?php echo $v_js_includes; ?>"></script>
 
     <script type="text/javascript">
-        jQuery(document).ready(function() {
+        $(function() {
             init();
 
             var productRegistrationController = new ProductRegistrationController();
@@ -146,49 +134,35 @@ if (count($emr_app)) {
             $("#authUser").focus();
         }
 
-        function transmit_form() {
-            document.forms[0].submit();
-        }
-
-        function imsubmitted() {
+        function transmit_form(element) {
+            // disable submit button to insert a notification of working
+            element.disabled = true;
+            // nothing fancy. mainly for mobile.
+            element.innerHTML = '<i class="fa fa-refresh fa-spin"></i> <?php echo xlt("Authenticating"); ?>';
             <?php if (!empty($GLOBALS['restore_sessions'])) { ?>
                 // Delete the session cookie by setting its expiration date in the past.
                 // This forces the server to create a new session ID.
                 var olddate = new Date();
                 olddate.setFullYear(olddate.getFullYear() - 1);
-                document.cookie = '<?php echo session_name() . '=' . session_id() ?>; path=<?php echo($web_root ? $web_root : '/');?>; expires=' + olddate.toGMTString();
+                document.cookie = <?php echo json_encode(urlencode(session_name())); ?> + '=' + <?php echo json_encode(urlencode(session_id())); ?> + '; path=<?php echo($web_root ? $web_root : '/');?>; expires=' + olddate.toGMTString();
             <?php } ?>
-            return false; //Currently the submit action is handled by the encrypt_form().
+            document.forms[0].submit();
         }
     </script>
-
 </head>
 <body class="login">
     <div class="container">
-        <form method="POST" id="login_form"
-            action="../main/main_screen.php?auth=login&site=<?php echo attr($_SESSION['site_id']); ?>"
-            target="_top" name="login_form" onsubmit="return imsubmitted();">
+        <form method="POST" id="login_form" autocomplete="off" action="../main/main_screen.php?auth=login&site=<?php echo attr($_SESSION['site_id']); ?>" target="_top" name="login_form">
             <div class="row">
                 <div class="col-sm-12">
                     <div>
-                        <div class="center-block" style="max-width:400px">
-                            <img class="img-fluid img-responsive center-block" src="<?php echo $GLOBALS['images_static_relative']; ?>/login-logo.png" />
+                        <div style="width: 50%;" class="mx-auto m-4">
+                            <?php echo file_get_contents($GLOBALS['images_static_absolute'] . "/login-logo.svg"); ?>
                         </div>
-
+                        
                         <input type='hidden' name='new_login_session_management' value='1' />
 
                         <?php
-                        // collect groups
-                        $res = sqlStatement("select distinct name from `groups`");
-                        for ($iter = 0; $row = sqlFetchArray($res); $iter++) {
-                              $result[$iter] = $row;
-                        }
-
-                        if (count($result) == 1) {
-                              $resvalue = $result[0]{"name"};
-                              echo "<input type='hidden' name='authProvider' value='" . attr($resvalue) . "' />\n";
-                        }
-
                         // collect default language id
                         $res2 = sqlStatement("select * from lang_languages where lang_description = ?", array($GLOBALS['language_default']));
                         for ($iter = 0; $row = sqlFetchArray($res2); $iter++) {
@@ -196,8 +170,8 @@ if (count($emr_app)) {
                         }
 
                         if (count($result2) == 1) {
-                            $defaultLangID = $result2[0]{"lang_id"};
-                            $defaultLangName = $result2[0]{"lang_description"};
+                            $defaultLangID = $result2[0]["lang_id"];
+                            $defaultLangName = $result2[0]["lang_description"];
                         } else {
                             //default to english if any problems
                             $defaultLangID = 1;
@@ -237,6 +211,12 @@ if (count($emr_app)) {
                         } else {
                             echo "<input type='hidden' name='languageChoice' value='".attr($defaultLangID)."' />\n";
                         }
+
+                        if ($GLOBALS['login_into_facility']) {
+                            $facilityService = new FacilityService();
+                            $facilities = $facilityService->getAll();
+                            $facilitySelected = ($GLOBALS['set_facility_cookie'] && isset($_COOKIE['pc_facility'])) ? $_COOKIE['pc_facility'] : null;
+                        }
                         ?>
                     </div>
                 </div>
@@ -244,18 +224,16 @@ if (count($emr_app)) {
             <div class="row">
                 <div class="col-sm-12">
                     <?php if (isset($_SESSION['relogin']) && ($_SESSION['relogin'] == 1)) : // Begin relogin dialog ?>
-                    <div class="alert alert-info m-1">
-                        <strong>
-                            <?php echo xlt('Password security has recently been upgraded.').'&nbsp;&nbsp;'.xlt('Please login again.'); ?>
-                        </strong>
+                    <div class="alert alert-info m-1 font-weight-bold">
+                        <?php echo xlt('Password security has recently been upgraded.').'&nbsp;&nbsp;'.xlt('Please login again.'); ?>
                     </div>
-                    <?php unset($_SESSION['relogin']);
+                        <?php unset($_SESSION['relogin']);
                     endif;
-if (isset($_SESSION['loginfailure']) && ($_SESSION['loginfailure'] == 1)) : // Begin login failure block ?>
+                    if (isset($_SESSION['loginfailure']) && ($_SESSION['loginfailure'] == 1)) : // Begin login failure block ?>
                     <div class="alert alert-danger login-failure m-1">
                         <?php echo xlt('Invalid username or password'); ?>
                     </div>
-                    <?php endif; // End login failure block?>
+                    <?php endif; // End login failure block ?>
                 </div>
             </div>
             <div class="row">
@@ -270,7 +248,7 @@ if (isset($_SESSION['loginfailure']) && ($_SESSION['loginfailure'] == 1)) : // B
                 <?php endif; ?>
                 <div class="col-sm-<?php echo $loginFormColumnCount;?>">
                     <div class="row">
-                        <div class="center-block login-title-label">
+                        <div class="mx-auto d-block login-title-label">
                             <?php if ($GLOBALS['show_label_login']) : ?>
                                 <?php echo text($openemr_name); ?>
                             <?php endif; ?>
@@ -280,50 +258,36 @@ if (isset($_SESSION['loginfailure']) && ($_SESSION['loginfailure'] == 1)) : // B
                         $t1 = $GLOBALS['tiny_logo_1'];
                         $t2 = $GLOBALS['tiny_logo_2'];
                         if ($t1 && !$t2) : ?>
-                            <div class="col-sm-12 center-block">
+                            <div class="col-sm-12 mx-auto d-block">
                                 <?php echo $tinylogocode1; ?>
                             </div>
-                        <?php
+                            <?php
                         endif;
                         if ($t2 && !$t1) : ?>
-                            <div class="col-sm-12 center-block">
+                            <div class="col-sm-12 mx-auto d-block">
                                 <?php echo $tinylogocode2; ?>
                             </div>
-                        <?php
+                            <?php
                         endif;
                         if ($t1 && $t2) : ?>
-                            <div class="col-sm-6 center-block"><?php echo $tinylogocode1;?></div>
-                            <div class="col-sm-6 center-block"><?php echo $tinylogocode2;?></div>
-                        <?php
+                            <div class="col-sm-6 mx-auto d-block"><?php echo $tinylogocode1;?></div>
+                            <div class="col-sm-6 mx-auto d-block"><?php echo $tinylogocode2;?></div>
+                            <?php
                         endif;
                         ?>
                     </div>
-                    <?php if (count($result) > 1) : // Begin Display check for groups ?>
-                        <div class="form-group">
-                            <label for="group" class="control-label text-right"><?php echo xlt('Group:'); ?></label>
-                            <div>
-                                <select name="authProvider" class="form-control">
-                                    <?php
-                                    foreach ($result as $iter) {
-                                        echo "<option value='".attr($iter{"name"})."'>".text($iter{"name"})."</option>\n";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-                        </div>
-                    <?php endif; // End Display check for groups ?>
                     <div class="form-group">
-                        <label for="authUser" class="control-label text-right"><?php echo xlt('Username:'); ?></label>
-                        <input type="text" class="form-control" id="authUser" name="authUser" placeholder="<?php echo xla('Username:'); ?>">
+                        <label for="authUser" class="text-right"><?php echo xlt('Username:'); ?></label>
+                        <input type="text" class="form-control" id="authUser" name="authUser" placeholder="<?php echo xla('Username:'); ?>" />
                     </div>
                     <div class="form-group">
-                        <label for="clearPass" class="control-label text-right"><?php echo xlt('Password:'); ?></label>
-                        <input type="password" class="form-control" id="clearPass" name="clearPass" placeholder="<?php echo xla('Password:'); ?>">
+                        <label for="clearPass" class="text-right"><?php echo xlt('Password:'); ?></label>
+                        <input type="password" class="form-control" id="clearPass" name="clearPass" placeholder="<?php echo xla('Password:'); ?>" />
                     </div>
                     <?php echo $div_app ?>
                     <?php if ($GLOBALS['language_menu_login'] && (count($result3) != 1)) : // Begin language menu block ?>
                         <div class="form-group">
-                            <label for="language" class="control-label text-right"><?php echo xlt('Language'); ?>:</label>
+                            <label for="language" class="text-right"><?php echo xlt('Language'); ?>:</label>
                             <div>
                                 <select class="form-control" name="languageChoice" size="1">
                                     <?php
@@ -349,10 +313,29 @@ if (isset($_SESSION['loginfailure']) && ($_SESSION['loginfailure'] == 1)) : // B
                             </div>
                         </div>
                     <?php endif; // End language menu block ?>
-                    <div class="form-group pull-right">
-                        <button type="submit" class="btn btn-default btn-lg" onClick="transmit_form()"><i class="fa fa-sign-in"></i>&nbsp;&nbsp;<?php echo xlt('Login');?></button>
+                    <?php if ($GLOBALS['login_into_facility']) : // Begin facilities menu block ?>
+                        <div class="form-group">
+                            <label for="facility" class="text-right"><?php echo xlt('Facility'); ?>:</label>
+                            <div>
+                                <select class="form-control" name="facility" size="1">
+                                    <option value="user_default"><?php echo xlt('My default facility'); ?></option>
+                                    <?php foreach ($facilities as $facility) : ?>
+                                        <?php if (!is_null($facilitySelected) && $facilitySelected == $facility['id']) : ?>
+                                            <option value="<?php echo attr($facility['id']);?>" selected ><?php echo text($facility['name']);?></option>
+                                        <?php else : ?>
+                                            <option value="<?php echo attr($facility['id']);?>"><?php echo text($facility['name']);?></option>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    <?php endif; // End facilities menu block ?>
+                    <div class="form-group oe-pull-away">
+                        <button type="submit" class="btn btn-secondary btn-lg" onClick="transmit_form(this)"><i class="fa fa-sign-in"></i>&nbsp;&nbsp;<?php echo xlt('Login');?></button>
                     </div>
                 </div>
+            </div>
+            <div class="row">
                 <div class="col-sm-12 text-center">
                     <p class="small">
                         <a href="../../acknowledge_license_cert.html" target="main"><?php echo xlt('Acknowledgments, Licensing and Certification'); ?></a>
@@ -360,8 +343,8 @@ if (isset($_SESSION['loginfailure']) && ($_SESSION['loginfailure'] == 1)) : // B
                 </div>
                 <div class="product-registration-modal" style="display: none">
                     <p class="context"><?php echo xlt("Register your installation with OEMR to receive important notifications, such as security fixes and new release announcements."); ?></p>
-                    <input placeholder="<?php echo xlt('email'); ?>" type="email" class="email" style="width: 100%; color: black" />
-                    <p class="message" style="font-style: italic"></p>
+                    <input placeholder="<?php echo xlt('email'); ?>" type="email" class="email w-100 text-body" />
+                    <p class="message font-italic"></p>
                 </div>
             </div>
         </form>

@@ -2,26 +2,33 @@
 /**
  * weno rx mark tx.
  *
- * @package OpenEMR
- * @link    http://www.open-emr.org
- * @author  Sherwin Gaddis <sherwingaddis@gmail.com>
- * @author  Brady Miller <brady.g.miller@gmail.com>
+ * @package   OpenEMR
+ * @link      http://www.open-emr.org
+ * @author    Sherwin Gaddis <sherwingaddis@gmail.com>
+ * @author    Brady Miller <brady.g.miller@gmail.com>
  * @copyright Copyright (c) 2016-2017 Sherwin Gaddis <sherwingaddis@gmail.com>
- * @copyright Copyright (c) 2017 Brady Miller <brady.g.miller@gmail.com>
- * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ * @copyright Copyright (c) 2017-2018 Brady Miller <brady.g.miller@gmail.com>
+ * @license   https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
 
 require_once("../globals.php");
 require_once($srcdir."/patient.inc");
+
+use OpenEMR\Common\Crypto\CryptoGen;
+use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Rx\Weno\TransmitData;
+
+if (!CsrfUtils::verifyCsrfToken($_GET["csrf_token_form"])) {
+    CsrfUtils::csrfNotVerified();
+}
 
 $date = date("Y-m-d");
 $pid = $GLOBALS['pid'];
 $uid = $_SESSION['authUserID'];
 
 //Randomly generate number for each order unique ID
-$i = rand();
+$i = rand().rand().rand();
 $fillData = filter_input(INPUT_GET, "getJson");
 
 $fill = explode(",", $fillData);
@@ -51,6 +58,9 @@ foreach ($fill as $data) {
     // Collect drug data
     $drugData = $prInfo->oneDrug($data);
 
+    // Set up crypto object
+    $cryptoGen = new CryptoGen();
+
     // Build the array
     $completeArray = array(
         array(
@@ -79,7 +89,7 @@ foreach ($fill as $data) {
                 "facilityzip"     => $proData[0]['postal_code'],
                 "qualifier"       => $GLOBALS['weno_provider_id'] . ':' . $proData[0]['weno_prov_id'],
                 "wenoAccountId"   => $GLOBALS['weno_account_id'],
-                "wenoAccountPass" => $GLOBALS['weno_account_pass'],
+                "wenoAccountPass" => (($cryptoGen->cryptCheckStandard($GLOBALS['weno_account_pass'])) ? $cryptoGen->decryptStandard($GLOBALS['weno_account_pass']) : $GLOBALS['weno_account_pass']),
                 "wenoClinicId"    => $GLOBALS['weno_provider_id'] . ':' . $proData[0]['weno_prov_id']
             )
         ),
@@ -101,15 +111,18 @@ foreach ($fill as $data) {
                 "refills"      => $drugData['refills'],
                 "dateModified" => $drugData['date_Modified'],
                 "note"         => $drugData['note'],
-                "take"         => $drugData['dosage']
+                "take"         => $drugData['dosage'],
+                "strength"     => $drugData['strength'],
+                "route"        => $drugData['route'],
+                "potency"      => $drugData['potency_unit_code'],
+                "qualifier"    => $drugData['drug_db_code_qualifier'],
+                "dea_sched"    => $drugData['dea_schedule']
             )
         )
     );
 
     // Convert the array to json
     $completeJson = json_encode($completeArray);
-
-
 
     // echo json
     echo $completeJson;

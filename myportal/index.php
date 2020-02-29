@@ -1,5 +1,5 @@
 <?php
-// +-----------------------------------------------------------------------------+ 
+// +-----------------------------------------------------------------------------+
 // Copyright (C) 2011 Z&H Consultancy Services Private Limited <sam@zhservices.com>
 //
 //
@@ -19,7 +19,7 @@
 // openemr/interface/login/GnuGPL.html
 // For more information write to the Free Software
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-// 
+//
 // Author:   Eldho Chacko <eldho@zhservices.com>
 //           Jacob T Paul <jacob@zhservices.com>
 //           Paul Simon   <paul@zhservices.com>
@@ -35,10 +35,10 @@ require_once("../interface/globals.php");
  $emr_path = $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];
  $emrpatharr = explode("/myportal", $emr_path);
  $emr_path = (!empty($_SERVER['HTTPS'])) ? "https://".$emrpatharr[0] : "http://".$emrpatharr[0];
- $row = sqlQuery("SELECT fname,lname FROM users WHERE id=?", array($_SESSION['authId']));
+ $row = sqlQuery("SELECT fname,lname FROM users WHERE id=?", array($_SESSION['authUserID']));
  sqlStatement("DELETE FROM audit_details WHERE audit_master_id IN(SELECT id FROM audit_master WHERE type=5 AND created_time<'".date("Y-m-d H:m", (strtotime(date("Y-m-d H:m")-7200))).":00')");
  sqlStatement("DELETE FROM audit_master WHERE type=5 AND created_time<'".date("Y-m-d H:m", (strtotime(date("Y-m-d H:m")-7200))).":00'");
- 
+
 function md5_pass($length = 8)
 {
     $randkey = substr(md5(rand().rand()), 0, $length);
@@ -71,7 +71,7 @@ for ($i=1; $i<=5; $i++) {//some times php is continuing without getting the retu
  function getshansubmit(){
     document.forms[0].submit();
  }
- 
+
 </script>
 </head>
 <title><?php echo xlt('Redirection');?></title>
